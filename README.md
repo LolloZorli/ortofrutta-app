@@ -116,21 +116,33 @@ Con il profilo `demo` esistono anche `commesso` / `commesso123`, `responsabile` 
 docker compose --profile app up --build        # app su http://localhost:3000, API su :8080
 ```
 
-## Aggiornare un'installazione esistente (Kubernetes)
+## CI/CD e deploy su Kubernetes
 
-La migrazione **V3** è *additiva*: crea e popola le nuove tabelle e colonne senza eliminare quelle vecchie
-(`products.category/unit/origin`, `users.role`). Così durante un rolling update le repliche vecchie continuano a funzionare, e un rollback è possibile.
+Ogni push su `master` esegue i test backend (`mvn verify`) e la build frontend. Se entrambi passano,
+GitHub Actions pubblica le immagini `backend` e `frontend` su GHCR (tag commit e `latest`) e aggiorna
+le risorse in `k8s/app.yaml`; il deploy attende il completamento dei rolling update. Le pull request
+eseguono solo la CI.
 
-1. **Backup**: `pg_dump` del database prima del rilascio.
-2. Rilascia **backend e frontend insieme**: l'API è cambiata (la vendita passa da `/api/stock/sales` a `/api/sales`, lo scarto usa `reasonId`),
-   quindi un frontend vecchio con un backend nuovo non può vendere. Il rolling update deve durare poco.
-3. Nessuna variabile d'ambiente nuova è obbligatoria; probe, porte e nomi dei servizi sono invariati.
-   Con più repliche, Flyway usa un lock su PostgreSQL: la migrazione gira una volta sola.
-4. I dati esistenti vengono migrati: categorie e origini già in uso diventano valori di tipologica; gli utenti `ADMIN`/`STAFF` mantengono il loro ruolo.
-5. Controlla le aliquote IVA (vedi sopra) e assegna i nuovi ruoli.
-6. Quando tutto gira sulla nuova versione, puoi eliminare le colonne vecchie con `docs/V4__drop_legacy_columns.sql.example`.
+Prima del primo push configura:
 
-## Test
+1. I secrets GitHub Actions `KUBE_CONFIG`, `GHCR_USERNAME` e `GHCR_READ_TOKEN` nelle impostazioni
+   del repository. Il kubeconfig deve autorizzare il deploy nel namespace `default`; il token GHCR
+   deve avere solo il permesso `read:packages` (e accesso ai package del repository). Non inserirli
+   nel repository.
+2. Nel cluster, il Secret `ortofrutta-config` nel namespace `default`, con le chiavi
+   `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET`
+   (casuale e di almeno 32 caratteri) e `ADMIN_PASSWORD`.
+3. Un database PostgreSQL raggiungibile dal cluster e già predisposto per l'app. Il database non è
+   creato dai manifest Kubernetes: usa un servizio PostgreSQL gestito o installalo e configura backup
+   persistenti prima di usare dati reali.
+4. Il Service frontend è di tipo `LoadBalancer`; l'indirizzo esterno dipende dal provider Kubernetes.
+   Il workflow crea/aggiorna `ghcr-pull-secret` usando i due secrets GHCR elencati sopra.
+
+La migrazione **V3** è *additiva*: prima del rilascio su un database esistente fai un backup con
+`pg_dump`. Backend e frontend vengono aggiornati insieme perché alcune API sono cambiate; Flyway
+applica le migrazioni all'avvio del backend. Verifica le aliquote IVA prima di usare dati reali.
+
+## Test locali
 
 ```bash
 cd backend && mvn verify             # serve Docker acceso (Testcontainers)
@@ -166,7 +178,8 @@ I test di integrazione condividono **un solo PostgreSQL** (Testcontainers) e un 
 ## Roadmap DevOps
 
 - [x] Dockerfile multi-stage, utente non root, CI base con GitHub Actions
+- [x] Pubblicazione immagini GHCR e deploy GitHub Actions su Kubernetes
 - [ ] Gate di sicurezza: Gitleaks, SAST (Semgrep/SonarQube), Trivy
-- [ ] Push dell'immagine su GHCR, Helm chart + Argo CD
+- [ ] Helm chart + Argo CD
 - [ ] Prometheus e Grafana
 - [ ] Terraform + AWS
