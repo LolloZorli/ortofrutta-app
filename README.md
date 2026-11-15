@@ -149,6 +149,9 @@ cd backend && mvn verify             # serve Docker acceso (Testcontainers)
 cd frontend && npm run build         # controllo dei tipi + build
 ```
 
+Se Testcontainers segnala che l'API Docker `1.32` è troppo vecchia, imposta
+`JAVA_TOOL_OPTIONS=-Dapi.version=1.44` prima di eseguire Maven. La CI backend usa già questo override.
+
 - `StockServiceTest`: logica FIFO, IVA congelata, quantità intere per le unità senza decimali (nessun database)
 - `LookupSlugTest`: generazione dei codici delle tipologiche
 - `ApiFlowTest`: carico, vendita, scarto, atomicità della vendita, paginazione
