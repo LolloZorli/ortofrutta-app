@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: ortofrutta
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ortofrutta
+    username: ortofrutta
+    password: ortofrutta
+  jpa:
+    hibernate:
+      ddl-auto: validate   # lo schema lo gestisce Flyway
+    open-in-view: false
+    properties:
+      hibernate.default_batch_fetch_size: 50
+      hibernate.jdbc.batch_size: 50
+      hibernate.order_inserts: true
+      hibernate.order_updates: true
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  compression:
+    enabled: true          # risposte JSON compresse: meno traffico, specie da telefono
+    min-response-size: 1024
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  jwt:
+    # In produzione: variabile d'ambiente JWT_SECRET, lunga e casuale (min. 32 caratteri)
+    secret: ${JWT_SECRET:dev-only-secret-change-me-at-least-32-bytes!!}
+    expiration: 8h
+  admin:
+    # Utente creato al primo avvio se la tabella utenti è vuota
+    username: ${ADMIN_USERNAME:admin}
+    password: ${ADMIN_PASSWORD:admin123}
+    # Se true, al primo accesso l'amministratore deve scegliere una nuova password
+    must-change-password: ${ADMIN_MUST_CHANGE_PASSWORD:true}

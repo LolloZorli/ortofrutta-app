@@ -1,0 +1,14 @@
+-- ESEMPIO, NON ATTIVO (il suffisso .example fa sì che Flyway lo ignori).
+--
+-- Migrazione "contract": elimina le colonne vecchie che la V3 ha lasciato per permettere il rolling update
+-- e il rollback. Usala SOLO quando:
+--   1. tutti i pod (backend) girano sulla nuova versione, e non tornerai indietro;
+--   2. hai un backup recente del database.
+--
+-- Per attivarla: copiala in backend/src/main/resources/db/migration/V4__drop_legacy_columns.sql
+-- e rilascia una nuova versione.
+
+ALTER TABLE products DROP COLUMN category;
+ALTER TABLE products DROP COLUMN unit;
+ALTER TABLE products DROP COLUMN origin;
+ALTER TABLE users    DROP COLUMN role;
