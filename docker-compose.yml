@@ -18,20 +18,16 @@ services:
       timeout: 3s
       retries: 10
 
-  # Si avviano solo con: docker compose --profile app up --build
-  # Così "docker compose up -d" continua ad avviare solo il database per sviluppare da IntelliJ.
   backend:
-    profiles: ["app"]
-    build: ./backend
+    image: ghcr.io/lollozorli/ortofrutta-app-backend:latest
     container_name: ortofrutta-backend
     ports:
       - "8080:8080"
     environment:
-      # Dentro la rete di compose il database si chiama "db", non "localhost"
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/ortofrutta
       SPRING_DATASOURCE_USERNAME: ortofrutta
       SPRING_DATASOURCE_PASSWORD: ortofrutta
-      SPRING_PROFILES_ACTIVE: demo   # carica dati di prova; toglilo per un database vuoto
+      SPRING_PROFILES_ACTIVE: demo
       JWT_SECRET: ${JWT_SECRET:-change-me-please-use-a-long-random-secret-0123456789}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
     depends_on:
@@ -39,8 +35,7 @@ services:
         condition: service_healthy
 
   frontend:
-    profiles: ["app"]
-    build: ./frontend
+    image: ghcr.io/lollozorli/ortofrutta-app-frontend:latest
     container_name: ortofrutta-frontend
     ports:
       - "3000:8080"
