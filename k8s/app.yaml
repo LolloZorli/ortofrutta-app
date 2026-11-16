@@ -9,11 +9,10 @@ metadata:
   name: pg-data-pvc
   namespace: ortofrutta
 spec:
-  accessModes:
-    - ReadWriteOnce
+  accessModes: [ReadWriteOnce]
   resources:
     requests:
-      storage: 1Gi
+      storage: 5Gi
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -21,6 +20,7 @@ metadata:
   name: db
   namespace: ortofrutta
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: db
@@ -30,20 +30,45 @@ spec:
         app: db
     spec:
       containers:
-        - name: db
+        - name: postgres
           image: postgres:16
           ports:
-            - containerPort: 5432
+            - name: postgres
+              containerPort: 5432
           env:
             - name: POSTGRES_DB
-              value: "ortofrutta"
+              value: ortofrutta
             - name: POSTGRES_USER
-              value: "ortofrutta"
+              valueFrom:
+                secretKeyRef:
+                  name: ortofrutta-config
+                  key: SPRING_DATASOURCE_USERNAME
             - name: POSTGRES_PASSWORD
-              value: "ortofrutta"
+              valueFrom:
+                secretKeyRef:
+                  name: ortofrutta-config
+                  key: SPRING_DATASOURCE_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           volumeMounts:
-            - mountPath: /var/lib/postgresql/data
-              name: pgdata
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
       volumes:
         - name: pgdata
           persistentVolumeClaim:
@@ -55,12 +80,13 @@ metadata:
   name: db
   namespace: ortofrutta
 spec:
-  type: LoadBalancer
-  ports:
-    - port: 5432
-      targetPort: 5432
+  type: ClusterIP
   selector:
     app: db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -91,6 +117,9 @@ spec:
           envFrom:
             - secretRef:
                 name: ortofrutta-config
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://db:5432/ortofrutta
           startupProbe:
             httpGet:
               path: /actuator/health/liveness
@@ -109,16 +138,20 @@ spec:
               port: http
             periodSeconds: 20
             failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: backend
   namespace: ortofrutta
-  labels:
-    app: ortofrutta-backend
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: ortofrutta-backend
   ports:
@@ -162,19 +195,23 @@ spec:
               path: /
               port: http
             periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: ortofrutta-frontend
   namespace: ortofrutta
-  labels:
-    app: ortofrutta-frontend
 spec:
   type: LoadBalancer
   selector:
     app: ortofrutta-frontend
   ports:
     - name: http
-      port: 3000
+      port: 80
       targetPort: http

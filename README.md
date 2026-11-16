@@ -119,24 +119,29 @@ docker compose --profile app up --build        # app su http://localhost:3000, A
 ## CI/CD e deploy su Kubernetes
 
 Ogni push su `master` esegue i test backend (`mvn verify`) e la build frontend. Se entrambi passano,
-GitHub Actions pubblica le immagini `backend` e `frontend` su GHCR (tag commit e `latest`) e aggiorna
-le risorse in `k8s/app.yaml`; il deploy attende il completamento dei rolling update. Le pull request
-eseguono solo la CI.
+GitHub Actions pubblica su GHCR le immagini `backend` e `frontend`, ciascuna con tag del commit e `latest`.
+Il deploy Kubernetes è facoltativo e parte dopo la pubblicazione quando la variabile repository
+`DEPLOY_KUBERNETES` è impostata a `true`. Le pull request eseguono solo la CI.
 
 Prima del primo push configura:
 
-1. I secrets GitHub Actions `KUBE_CONFIG`, `GHCR_USERNAME` e `GHCR_READ_TOKEN` nelle impostazioni
-   del repository. Il kubeconfig deve autorizzare il deploy nel namespace `default`; il token GHCR
-   deve avere solo il permesso `read:packages` (e accesso ai package del repository). Non inserirli
-   nel repository.
-2. Nel cluster, il Secret `ortofrutta-config` nel namespace `default`, con le chiavi
-   `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET`
-   (casuale e di almeno 32 caratteri) e `ADMIN_PASSWORD`.
-3. Un database PostgreSQL raggiungibile dal cluster e già predisposto per l'app. Il database non è
-   creato dai manifest Kubernetes: usa un servizio PostgreSQL gestito o installalo e configura backup
-   persistenti prima di usare dati reali.
-4. Il Service frontend è di tipo `LoadBalancer`; l'indirizzo esterno dipende dal provider Kubernetes.
-   Il workflow crea/aggiorna `ghcr-pull-secret` usando i due secrets GHCR elencati sopra.
+1. Aggiungi il secret GitHub Actions `KUBE_CONFIG` con un kubeconfig autorizzato a gestire il namespace
+   `ortofrutta`, e la variabile repository `DEPLOY_KUBERNETES=true`. Il workflow usa il `GITHUB_TOKEN`
+   per pubblicare i package; non serve un token GHCR per il job.
+2. Se i package GHCR sono privati, crea nel namespace `ortofrutta` il secret `ghcr-pull-secret`
+   con un token GitHub che abbia `read:packages` e accesso ai package. Se li rendi pubblici, il secret
+   non è necessario: in tal caso rimuovi `imagePullSecrets` dai Deployment.
+3. Prima del deploy crea nel namespace `ortofrutta` il Secret `ortofrutta-config` con le chiavi
+   `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET` (casuale e di almeno
+   32 caratteri), `ADMIN_PASSWORD` e, se serve, `ADMIN_USERNAME`. Le credenziali PostgreSQL devono
+   essere le stesse usate dal pod Postgres. Il manifest crea un PostgreSQL con PVC da 5Gi; per dati
+   reali configura storage e backup adeguati oppure usa un database gestito e modifica il manifest.
+4. Il Service frontend è di tipo `LoadBalancer` sulla porta 80; l'indirizzo esterno dipende dal
+   provider Kubernetes. Il database e il backend sono esposti solo all'interno del cluster.
+
+Il namespace, PVC, Deployment e Service sono definiti in `k8s/app.yaml`. Le immagini vengono prima
+pubblicate su GHCR e poi impostate sui Deployment usando il tag immutabile del commit; il workflow
+attende la fine dei rolling update.
 
 La migrazione **V3** è *additiva*: prima del rilascio su un database esistente fai un backup con
 `pg_dump`. Backend e frontend vengono aggiornati insieme perché alcune API sono cambiate; Flyway

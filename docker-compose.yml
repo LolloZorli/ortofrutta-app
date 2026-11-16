@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:16
@@ -19,6 +17,9 @@ services:
       retries: 10
 
   backend:
+    profiles: [app]
+    build:
+      context: ./backend
     image: ghcr.io/lollozorli/ortofrutta-app-backend:latest
     container_name: ortofrutta-backend
     ports:
@@ -35,6 +36,9 @@ services:
         condition: service_healthy
 
   frontend:
+    profiles: [app]
+    build:
+      context: ./frontend
     image: ghcr.io/lollozorli/ortofrutta-app-frontend:latest
     container_name: ortofrutta-frontend
     ports:
