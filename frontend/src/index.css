@@ -872,6 +872,7 @@ textarea:focus {
     width: 248px;
     max-width: none;
     position: fixed;
+    transform: none;
     flex-direction: column;
     align-items: stretch;
     gap: 6px;
