@@ -22,9 +22,21 @@ export default function DashboardPage() {
   ]
   const visibleStats = stats.filter((s) => s.value !== null)
   const showTop = data.topProducts.length > 0 || can('REPORTS_VIEW')
+  const now = new Date()
+  const today = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }).format(now)
+  const dateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
   return (
     <div className="stack">
+      <section className="dashboard-hero" aria-labelledby="dashboard-title">
+        <div>
+          <p className="dashboard-eyebrow">PANORAMICA DEL NEGOZIO</p>
+          <h2 id="dashboard-title">Il banco, a colpo d’occhio</h2>
+          <p>Incassi, scorte e attività da tenere sotto controllo.</p>
+        </div>
+        <time className="dashboard-date" dateTime={dateTime}>{today}</time>
+      </section>
+
       {visibleStats.length > 0 && (
         <div className="stats">
           {visibleStats.map((s) => (
@@ -33,65 +45,77 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="fab-row">
+      <div className="fab-row dashboard-actions" aria-label="Azioni rapide">
         {can('SALES_CREATE') && (
           <Link to="/cassa" className="btn btn-primary grow center">
-            Cassa
+            <span aria-hidden="true">＋</span> Nuova vendita
           </Link>
         )}
         {can('RESERVATIONS_MANAGE') && (
           <Link to="/prenotazioni" className="btn grow center">
-            Prenotazioni ({data.openReservations})
+            Prenotazioni <span className="action-count">{data.openReservations}</span>
           </Link>
         )}
       </div>
 
-      <h3 className="section-title">Da riordinare ({data.lowStock.length})</h3>
-      {data.lowStock.length === 0 ? (
-        <Empty>Tutte le scorte sono sopra il minimo 👍</Empty>
-      ) : (
-        <div className="list">
-          {data.lowStock.map((i) => (
-            <div key={i.productId} className="card row between">
-              <div>
-                <div className="item-title">{i.productName}</div>
-                <div className="item-sub">
-                  Giacenza {qty(i.stock, i.unit)} · minimo {qty(i.minStock, i.unit)}
-                </div>
-              </div>
-              <Chip tone="red">+{qty(i.suggestedQuantity, i.unit)}</Chip>
+      <div className="dashboard-grid">
+        <section className="card dashboard-panel" aria-labelledby="low-stock-title">
+          <div className="dashboard-panel-head">
+            <div>
+              <p className="dashboard-eyebrow">SCORTE</p>
+              <h3 id="low-stock-title">Da riordinare</h3>
             </div>
-          ))}
-          {can('SUPPLIER_ORDERS_MANAGE') ? (
-            <Link to="/ordini" className="btn center">
-              Crea ordine al fornitore
-            </Link>
+            <span className={`dashboard-count${data.lowStock.length ? ' is-alert' : ''}`}>{data.lowStock.length}</span>
+          </div>
+          {data.lowStock.length === 0 ? (
+            <p className="dashboard-empty">Tutte le scorte sono sopra il minimo.</p>
           ) : (
-            <p className="muted center">Segnala a chi gestisce gli ordini cosa va riordinato.</p>
-          )}
-        </div>
-      )}
-
-      <h3 className="section-title">In scadenza (3 giorni)</h3>
-      {data.expiring.length === 0 ? (
-        <Empty>Nessun lotto in scadenza</Empty>
-      ) : (
-        <div className="list">
-          {data.expiring.map((l) => (
-            <div key={l.lotId} className="card row between">
-              <div>
-                <div className="item-title">{l.productName}</div>
-                <div className="item-sub">{qty(l.remainingQuantity, l.unit)} rimasti</div>
-              </div>
-              <Chip tone={l.daysToExpiry <= 0 ? 'red' : 'orange'}>{expiryLabel(l.daysToExpiry)}</Chip>
+            <div className="dashboard-list">
+              {data.lowStock.map((i) => (
+                <div key={i.productId} className="dashboard-row">
+                  <div className="dashboard-item-copy">
+                    <div className="item-title">{i.productName}</div>
+                    <div className="item-sub">Disponibili {qty(i.stock, i.unit)} · minimo {qty(i.minStock, i.unit)}</div>
+                  </div>
+                  <Chip tone="red">+{qty(i.suggestedQuantity, i.unit)}</Chip>
+                </div>
+              ))}
+              {can('SUPPLIER_ORDERS_MANAGE') && (
+                <Link to="/ordini" className="btn dashboard-link">Prepara un ordine <span aria-hidden="true">→</span></Link>
+              )}
             </div>
-          ))}
-        </div>
-      )}
+          )}
+        </section>
+
+        <section className="card dashboard-panel" aria-labelledby="expiring-title">
+          <div className="dashboard-panel-head">
+            <div>
+              <p className="dashboard-eyebrow">LOTTI</p>
+              <h3 id="expiring-title">In scadenza</h3>
+            </div>
+            <span className={`dashboard-count${data.expiring.length ? ' is-warn' : ''}`}>{data.expiring.length}</span>
+          </div>
+          {data.expiring.length === 0 ? (
+            <p className="dashboard-empty">Nessun lotto in scadenza nei prossimi 3 giorni.</p>
+          ) : (
+            <div className="dashboard-list">
+              {data.expiring.map((l) => (
+                <div key={l.lotId} className="dashboard-row">
+                  <div className="dashboard-item-copy">
+                    <div className="item-title">{l.productName}</div>
+                    <div className="item-sub">{qty(l.remainingQuantity, l.unit)} rimasti</div>
+                  </div>
+                  <Chip tone={l.daysToExpiry <= 0 ? 'red' : 'orange'}>{expiryLabel(l.daysToExpiry)}</Chip>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
 
       {showTop && (
         <>
-          <h3 className="section-title">Più venduti (30 giorni)</h3>
+          <h3 className="section-title">Più venduti <span>ultimi 30 giorni</span></h3>
           {data.topProducts.length === 0 ? (
             <Empty>Ancora nessuna vendita</Empty>
           ) : (
