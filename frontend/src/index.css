@@ -835,7 +835,7 @@ textarea:focus {
   transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
-@media (min-width: 760px) {
+@media (min-width: 1024px) {
   .app {
     display: grid;
     grid-template-columns: 248px minmax(0, 1fr);
@@ -881,6 +881,8 @@ textarea:focus {
     border-radius: 0;
     box-shadow: none;
     background: var(--card);
+    overflow-y: auto;
+    overflow-x: hidden;
   }
   .nav-brand {
     display: flex;
@@ -940,6 +942,20 @@ textarea:focus {
   .product-tile:not(:disabled):hover {
     transform: translateY(-1px);
     box-shadow: 0 10px 24px rgba(35, 57, 39, 0.12);
+  }
+}
+
+@media (max-width: 1023px) {
+  .tabbar {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .tabbar::-webkit-scrollbar {
+    display: none;
+  }
+  .tab {
+    flex: 1 0 54px;
   }
 }
 
