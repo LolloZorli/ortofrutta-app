@@ -1,7 +1,71 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ortofrutta
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pg-data-pvc
+  namespace: ortofrutta
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  namespace: ortofrutta
+spec:
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: db
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "ortofrutta"
+            - name: POSTGRES_USER
+              value: "ortofrutta"
+            - name: POSTGRES_PASSWORD
+              value: "ortofrutta"
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: pgdata
+      volumes:
+        - name: pgdata
+          persistentVolumeClaim:
+            claimName: pg-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: ortofrutta
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: db
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ortofrutta-backend
+  namespace: ortofrutta
   labels:
     app: ortofrutta-backend
 spec:
@@ -49,6 +113,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: backend
+  namespace: ortofrutta
   labels:
     app: ortofrutta-backend
 spec:
@@ -64,6 +129,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ortofrutta-frontend
+  namespace: ortofrutta
   labels:
     app: ortofrutta-frontend
 spec:
@@ -100,6 +166,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ortofrutta-frontend
+  namespace: ortofrutta
   labels:
     app: ortofrutta-frontend
 spec:
