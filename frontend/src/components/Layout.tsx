@@ -39,17 +39,33 @@ const TITLES: Record<string, string> = {
 
 export default function Layout() {
   const { pathname } = useLocation()
-  const { can } = useAuth()
+  const { can, profile } = useAuth()
   const tabs = TABS.filter((t) => !t.perm || can(t.perm))
   return (
     <div className="app">
       <header className="topbar">
-        <h1>{TITLES[pathname] ?? 'Ortofrutta'}</h1>
+        <h1>
+          <img src="/icon.svg" alt="" />
+          {TITLES[pathname] ?? 'Ortofrutta'}
+        </h1>
+        {profile && (
+          <div className="topbar-user">
+            <span className="user-avatar" aria-hidden="true">{profile.username.slice(0, 1).toUpperCase()}</span>
+            <span className="user-label">
+              <strong>{profile.username}</strong>
+              <small>{profile.roleName}</small>
+            </span>
+          </div>
+        )}
       </header>
       <main className="content">
         <Outlet />
       </main>
       <nav className="tabbar" aria-label="Navigazione principale">
+        <div className="nav-brand">
+          <img src="/icon.svg" alt="" />
+          <span>Ortofrutta<small>Gestione negozio</small></span>
+        </div>
         {tabs.map((t) => (
           <NavLink key={t.to} to={t.to} end={t.end} className={({ isActive }) => (isActive ? 'tab active' : 'tab')}>
             <span className="tab-icon" aria-hidden="true">
@@ -58,6 +74,12 @@ export default function Layout() {
             <span>{t.label}</span>
           </NavLink>
         ))}
+        {profile && (
+          <div className="nav-user">
+            <span className="user-avatar" aria-hidden="true">{profile.username.slice(0, 1).toUpperCase()}</span>
+            <span><strong>{profile.username}</strong><small>{profile.roleName}</small></span>
+          </div>
+        )}
       </nav>
     </div>
   )
