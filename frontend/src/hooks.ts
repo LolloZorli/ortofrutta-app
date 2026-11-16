@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { errorMessage } from './api'
 import type { PageResponse } from './types'
 
@@ -42,9 +42,15 @@ export function usePaged<T>(fetchPage: (page: number) => Promise<PageResponse<T>
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
+  const generation = useRef(0)
+  const loadingMoreRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
+    generation.current += 1
+    const currentGeneration = generation.current
+    loadingMoreRef.current = false
+    setLoadingMore(false)
     setLoading(true)
     fetchPage(0)
       .then((r) => {
@@ -61,20 +67,29 @@ export function usePaged<T>(fetchPage: (page: number) => Promise<PageResponse<T>
       })
     return () => {
       cancelled = true
+      if (generation.current === currentGeneration) generation.current += 1
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, tick])
 
   async function loadMore() {
+    if (loadingMoreRef.current) return
+    loadingMoreRef.current = true
+    const currentGeneration = generation.current
     setLoadingMore(true)
     try {
       const r = await fetchPage(info.page + 1)
-      setItems((prev) => [...prev, ...r.content])
-      setInfo({ page: r.page, totalPages: r.totalPages, total: r.totalElements })
+      if (generation.current === currentGeneration) {
+        setItems((prev) => [...prev, ...r.content])
+        setInfo({ page: r.page, totalPages: r.totalPages, total: r.totalElements })
+      }
     } catch (e) {
-      setError(errorMessage(e))
+      if (generation.current === currentGeneration) setError(errorMessage(e))
     } finally {
-      setLoadingMore(false)
+      if (generation.current === currentGeneration) {
+        loadingMoreRef.current = false
+        setLoadingMore(false)
+      }
     }
   }
 
