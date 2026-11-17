@@ -64,13 +64,14 @@ class RolesTest extends IntegrationTestBase {
     }
 
     @Test
-    void managerSeesCostsAndReportsButCannotTouchPricesUsersOrLookups() throws Exception {
+    void managerCanManageProductsAndReportsButNotUsersOrLookups() throws Exception {
         String admin = admin();
         String manager = readyUser(admin, "luisa", "MANAGER");
 
         mvc.perform(post("/api/products").header(AUTH, manager).contentType(JSON)
-                        .content("{\"name\":\"Vietato\",\"categoryId\":1,\"unitId\":1,\"salePrice\":1,\"vatRateId\":1}"))
-                .andExpect(status().isForbidden());
+                        .content("{\"name\":\"Prodotto responsabile\",\"categoryId\":1,\"unitId\":1,\"salePrice\":1,\"vatRateId\":1}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("Prodotto responsabile"));
         mvc.perform(get("/api/users").header(AUTH, manager)).andExpect(status().isForbidden());
         mvc.perform(post("/api/admin/lookups/CATEGORY").header(AUTH, manager).contentType(JSON)
                         .content("{\"name\":\"Non permesso\"}"))
