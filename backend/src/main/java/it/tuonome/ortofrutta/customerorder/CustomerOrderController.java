@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
 
@@ -17,6 +18,18 @@ public class CustomerOrderController {
 
     public CustomerOrderController(CustomerOrderService service) {
         this.service = service;
+    }
+
+    @GetMapping("/mine")
+    public List<CustomerOrderDtos.Response> mine(Authentication auth) {
+        return service.myOrders(auth.getName());
+    }
+
+    @PostMapping("/mine")
+    @ResponseStatus(HttpStatus.CREATED)
+    public CustomerOrderDtos.Response createForCustomer(@Valid @RequestBody CustomerOrderDtos.CustomerRequest request,
+                                                        Authentication auth) {
+        return service.createForCustomer(auth.getName(), request);
     }
 
     @GetMapping

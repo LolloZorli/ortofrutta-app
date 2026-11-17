@@ -5,6 +5,10 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -20,6 +24,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -36,9 +42,10 @@ public class SecurityConfig {
                                             UserJwtAuthenticationConverter jwtConverter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable()) // API stateless con token Bearer: niente cookie, niente CSRF
+                .cors(cors -> { })
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/login",
+                        .requestMatchers("/api/auth/login", "/api/auth/register",
                                 "/actuator/health", "/actuator/health/**",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/api/auth/me", "/api/auth/change-password").authenticated()
@@ -50,6 +57,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/audit/**").hasAuthority("AUDIT_VIEW")
 
                         // prodotti e prezzi
+                        .requestMatchers(HttpMethod.GET, "/api/catalog").hasAuthority("CATALOG_READ")
                         .requestMatchers(HttpMethod.GET, "/api/products/**").hasAuthority("PRODUCTS_READ")
                         .requestMatchers("/api/products/**").hasAuthority("PRODUCTS_WRITE")
 
@@ -78,11 +86,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/customers/**").hasAuthority("CUSTOMERS_DELETE")
                         .requestMatchers("/api/customers/**")
                                 .hasAnyAuthority("CUSTOMERS_MANAGE", "RESERVATIONS_MANAGE")
+                        .requestMatchers(HttpMethod.GET, "/api/customer-orders/mine").hasAuthority("CUSTOMER_ORDER_READ")
+                        .requestMatchers(HttpMethod.POST, "/api/customer-orders/mine").hasAuthority("CUSTOMER_ORDER_CREATE")
                         .requestMatchers("/api/customer-orders/**").hasAuthority("RESERVATIONS_MANAGE")
 
                         // report (la dashboard e le tipologiche in lettura sono per tutti gli utenti attivi)
                         .requestMatchers("/api/reports/products", "/api/reports/corrispettivi", "/api/reports/cash-closing")
                                 .hasAuthority("REPORTS_VIEW")
+                        .requestMatchers(HttpMethod.GET, "/api/reports/dashboard")
+                                .hasAnyAuthority("STOCK_READ", "SALES_CREATE", "REPORTS_VIEW", "SUPPLIER_ORDERS_MANAGE")
                         .requestMatchers("/api/reports/reorder-suggestions")
                                 .hasAnyAuthority("SUPPLIER_ORDERS_MANAGE", "REPORTS_VIEW")
 
@@ -94,6 +106,20 @@ public class SecurityConfig {
     @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins:}") String configuredOrigins) {
+        CorsConfiguration configuration = new CorsConfiguration();
+        List<String> origins = Arrays.stream(configuredOrigins.split(","))
+                .map(String::trim).filter(origin -> !origin.isEmpty()).toList();
+        configuration.setAllowedOrigins(origins);
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        configuration.setAllowCredentials(false);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", configuration);
+        return source;
     }
 
     @Bean

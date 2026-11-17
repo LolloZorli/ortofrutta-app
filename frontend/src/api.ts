@@ -36,6 +36,7 @@ export class ApiError extends Error {
 }
 
 let onUnauthorized: () => void = () => {}
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
 export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn
 }
@@ -48,7 +49,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   let res: Response
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(`${API_BASE_URL}/api${path}`, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,

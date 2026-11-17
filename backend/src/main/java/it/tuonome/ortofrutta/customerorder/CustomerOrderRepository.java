@@ -15,4 +15,7 @@ public interface CustomerOrderRepository extends JpaRepository<CustomerOrder, Lo
     /** Storico: solo le più recenti (pagina richiesta), non tutta la tabella. */
     @EntityGraph(attributePaths = {"customer"})
     List<CustomerOrder> findAllByOrderByPickupDateDescIdDesc(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"customer", "lines", "lines.product"})
+    List<CustomerOrder> findAllByCustomerIdOrderByCreatedAtDesc(Long customerId);
 }

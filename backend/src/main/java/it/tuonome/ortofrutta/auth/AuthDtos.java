@@ -2,6 +2,7 @@ package it.tuonome.ortofrutta.auth;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Email;
 
 import java.time.Instant;
 import java.util.List;
@@ -14,10 +15,15 @@ public final class AuthDtos {
     public record LoginRequest(@NotBlank String username, @NotBlank String password) {
     }
 
-    public record Profile(String username, String roleCode, String roleName,
+    public record CustomerRegistrationRequest(@NotBlank @Size(max = 120) String name,
+                                              @NotBlank @Email @Size(max = 254) String email,
+                                              @Size(max = 30) String phone,
+                                              @NotBlank @Size(min = 8, max = 72) String password) { }
+
+    public record Profile(String username, String email, String roleCode, String roleName,
                           List<String> permissions, boolean mustChangePassword) {
         static Profile from(AppUser u) {
-            return new Profile(u.getUsername(), u.getRole().getCode(), u.getRole().getName(),
+            return new Profile(u.getUsername(), u.getEmail(), u.getRole().getCode(), u.getRole().getName(),
                     u.getRole().effectivePermissions().stream().map(Enum::name).sorted().toList(),
                     u.isMustChangePassword());
         }

@@ -1,6 +1,8 @@
 package it.tuonome.ortofrutta.auth;
 
 import it.tuonome.ortofrutta.common.BusinessException;
+import it.tuonome.ortofrutta.customer.Customer;
+import it.tuonome.ortofrutta.customer.CustomerRepository;
 import it.tuonome.ortofrutta.config.AppProperties;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,19 +24,23 @@ public class AuthService {
     private final PasswordEncoder encoder;
     private final JwtEncoder jwtEncoder;
     private final AppProperties props;
+    private final CustomerRepository customers;
+    private final RoleRepository roles;
 
     public AuthService(UserRepository users, PasswordEncoder encoder,
-                       JwtEncoder jwtEncoder, AppProperties props) {
+                       JwtEncoder jwtEncoder, AppProperties props, CustomerRepository customers, RoleRepository roles) {
         this.users = users;
         this.encoder = encoder;
         this.jwtEncoder = jwtEncoder;
         this.props = props;
+        this.customers = customers;
+        this.roles = roles;
     }
 
     @Transactional(readOnly = true)
     public AuthDtos.LoginResponse login(AuthDtos.LoginRequest request) {
         String username = request.username().trim().toLowerCase(Locale.ROOT);
-        AppUser user = users.findWithRoleByUsername(username)
+        AppUser user = (username.contains("@") ? users.findWithRoleByEmailIgnoreCase(username) : users.findWithRoleByUsername(username))
                 .filter(AppUser::isEnabled)
                 .filter(u -> encoder.matches(request.password(), u.getPasswordHash()))
                 .orElseThrow(() -> new BadCredentialsException("Credenziali non valide"));
@@ -53,6 +59,18 @@ public class AuthService {
                 .encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
         return new AuthDtos.LoginResponse(token, expiresAt, AuthDtos.Profile.from(user));
+    }
+
+    @Transactional
+    public void registerCustomer(AuthDtos.CustomerRegistrationRequest request) {
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        if (users.existsByEmailIgnoreCase(email) || users.existsByUsername(email)) {
+            throw new BusinessException("Esiste già un account con questa email");
+        }
+        AppRole customerRole = roles.findByCode(AppRole.CUSTOMER_CODE)
+                .orElseThrow(() -> new IllegalStateException("Ruolo Cliente mancante: migrazione V6 non applicata"));
+        Customer customer = customers.save(new Customer(request.name(), request.phone(), null, null));
+        users.save(new AppUser(email, email, customer.getId(), encoder.encode(request.password()), customerRole, false));
     }
 
     @Transactional(readOnly = true)

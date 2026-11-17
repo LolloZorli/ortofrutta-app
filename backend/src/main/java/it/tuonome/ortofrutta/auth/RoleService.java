@@ -45,8 +45,8 @@ public class RoleService {
     }
 
     public List<RoleDtos.Option> options() {
-        return roles.findAllByOrderByNameAsc().stream()
-                .map(r -> new RoleDtos.Option(r.getId(), r.getName())).toList();
+        return roles.findAllByOrderByNameAsc().stream().filter(r -> !r.isCustomerRole())
+                .map(r -> new RoleDtos.Option(r.getId(), r.getCode(), r.getName())).toList();
     }
 
     @Transactional
@@ -63,8 +63,8 @@ public class RoleService {
     @Transactional
     public RoleDtos.Response update(Long id, RoleDtos.Request r) {
         AppRole role = find(id);
-        if (role.isAdminRole()) {
-            throw new BusinessException("Il ruolo Amministratore non è modificabile");
+        if (role.isAdminRole() || role.isCustomerRole()) {
+            throw new BusinessException("Questo ruolo di sistema non è modificabile");
         }
         if (roles.existsByNameIgnoreCaseAndIdNot(r.name().trim(), id)) {
             throw new BusinessException("Esiste già un ruolo con questo nome");

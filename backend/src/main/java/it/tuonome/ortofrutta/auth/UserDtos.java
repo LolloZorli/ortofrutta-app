@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Email;
 
 public final class UserDtos {
 
@@ -15,6 +16,7 @@ public final class UserDtos {
             @Size(min = 3, max = 50)
             @Pattern(regexp = "[A-Za-z0-9._-]+", message = "Solo lettere, numeri, punto, trattino e underscore")
             String username,
+            @Email @Size(max = 254) String email,
             @NotBlank @Size(min = 8, max = 72, message = "La password deve avere da 8 a 72 caratteri") String password,
             @NotNull Long roleId
     ) {
@@ -28,10 +30,10 @@ public final class UserDtos {
     ) {
     }
 
-    public record Response(Long id, String username, Long roleId, String roleName,
+    public record Response(Long id, String username, String email, Long roleId, String roleName,
                            boolean enabled, boolean mustChangePassword) {
         static Response from(AppUser u) {
-            return new Response(u.getId(), u.getUsername(), u.getRole().getId(), u.getRole().getName(),
+            return new Response(u.getId(), u.getUsername(), u.getEmail(), u.getRole().getId(), u.getRole().getName(),
                     u.isEnabled(), u.isMustChangePassword());
         }
     }

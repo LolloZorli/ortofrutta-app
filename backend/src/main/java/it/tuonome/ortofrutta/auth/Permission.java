@@ -7,6 +7,9 @@ package it.tuonome.ortofrutta.auth;
  */
 public enum Permission {
     PRODUCTS_READ("Vedere il listino prodotti", "Prodotti", false),
+    CATALOG_READ("Vedere il catalogo pubblico per effettuare ordini", "Clienti online", false),
+    CUSTOMER_ORDER_CREATE("Creare ordini cliente", "Clienti online", false),
+    CUSTOMER_ORDER_READ("Vedere i propri ordini cliente", "Clienti online", false),
     PRODUCTS_WRITE("Aggiungere e modificare prodotti e prezzi di listino", "Prodotti", false),
 
     SALES_CREATE("Registrare vendite in cassa", "Cassa", false),

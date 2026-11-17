@@ -11,6 +11,7 @@ import java.util.Set;
 public class AppRole {
 
     public static final String ADMIN_CODE = "ADMIN";
+    public static final String CUSTOMER_CODE = "CUSTOMER";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -51,6 +52,8 @@ public class AppRole {
     public boolean isAdminRole() {
         return systemRole && ADMIN_CODE.equals(code);
     }
+
+    public boolean isCustomerRole() { return systemRole && CUSTOMER_CODE.equals(code); }
 
     /** L'amministratore ha sempre tutti i permessi, anche quelli aggiunti in versioni future. */
     public Set<Permission> effectivePermissions() {

@@ -16,6 +16,7 @@ const TABS: Tab[] = [
   { to: '/magazzino', label: 'Magazzino', icon: '📦', perm: 'STOCK_READ' },
   { to: '/ordini', label: 'Ordini', icon: '🚚', perm: 'SUPPLIER_ORDERS_MANAGE' },
   { to: '/prenotazioni', label: 'Prenota', icon: '🛍️', perm: 'RESERVATIONS_MANAGE' },
+  { to: '/area-clienti', label: 'I miei ordini', icon: '🧺', perm: 'CUSTOMER_ORDER_READ' },
   { to: '/altro', label: 'Altro', icon: '⋯' },
 ]
 
@@ -25,6 +26,7 @@ const TITLES: Record<string, string> = {
   '/magazzino': 'Magazzino',
   '/ordini': 'Ordini ai fornitori',
   '/prenotazioni': 'Prenotazioni clienti',
+  '/area-clienti': 'Ordini online',
   '/altro': 'Altro',
   '/prodotti': 'Prodotti e prezzi',
   '/fornitori': 'Fornitori',
@@ -39,8 +41,10 @@ const TITLES: Record<string, string> = {
 
 export default function Layout() {
   const { pathname } = useLocation()
-  const { can, profile } = useAuth()
-  const tabs = TABS.filter((t) => !t.perm || can(t.perm))
+  const { can, profile, logout } = useAuth()
+  const tabs = profile?.roleCode === 'CUSTOMER'
+    ? TABS.filter((t) => t.to === '/area-clienti')
+    : TABS.filter((t) => !t.perm || can(t.perm))
   return (
     <div className="app">
       <header className="topbar">
@@ -55,6 +59,7 @@ export default function Layout() {
               <strong>{profile.username}</strong>
               <small>{profile.roleName}</small>
             </span>
+            {profile.roleCode === 'CUSTOMER' && <button className="btn btn-sm" onClick={logout}>Esci</button>}
           </div>
         )}
       </header>

@@ -38,8 +38,13 @@ public class UserService {
         if (users.existsByUsername(username)) {
             throw new BusinessException("Esiste già un utente con questo nome");
         }
+        String email = r.email() == null || r.email().isBlank() ? null : r.email().trim().toLowerCase(Locale.ROOT);
+        if (email != null && users.existsByEmailIgnoreCase(email)) {
+            throw new BusinessException("Questa email è già associata a un utente");
+        }
         AppRole role = findRole(r.roleId());
-        AppUser u = users.save(new AppUser(username, encoder.encode(r.password()), role, true));
+        if (role.isCustomerRole()) throw new BusinessException("Gli account cliente vengono creati dalla registrazione clienti");
+        AppUser u = users.save(new AppUser(username, email, null, encoder.encode(r.password()), role, true));
         audit.record("USER_CREATE", "USER", u.getId(), username + " (" + role.getName() + ")");
         return UserDtos.Response.from(u);
     }
@@ -52,6 +57,7 @@ public class UserService {
             throw new BusinessException("Non puoi modificare il tuo stesso ruolo o stato");
         }
         AppRole role = findRole(r.roleId());
+        if (role.isCustomerRole()) throw new BusinessException("Il ruolo Cliente si assegna solo tramite la registrazione clienti");
         u.setRole(role);
         u.setEnabled(r.enabled());
         audit.record("USER_UPDATE", "USER", id, u.getUsername() + ": " + role.getName()

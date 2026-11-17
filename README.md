@@ -17,10 +17,11 @@ Interfaccia pensata per il telefono, da usare con una mano dietro al banco.
 | **Prenotazioni** | Nuova → Pronta → Ritirata. Il ritiro diventa una vendita di cassa con il suo metodo di pagamento |
 | **Corrispettivi** | Riepilogo giornaliero per aliquota IVA (imponibile e imposta scorporati) e per metodo di pagamento; chiusura contanti con differenza tra atteso e contato |
 | **Clienti** | Anagrafica e storico acquisti associati alle vendite |
+| **Portale clienti** | Registrazione con email e password, catalogo senza giacenze interne, invio e consultazione dei propri ordini |
 | **Cartellini** | Stampa dei cartellini prezzo dei prodotti attivi e filtrati |
 | **Report** | Incasso, valore magazzino, margine, scarti, più venduti, lotti in scadenza, report per prodotto |
 | **Tipologiche** | Categorie, unità di misura, aliquote IVA, origini, motivi di scarto, metodi di pagamento, tipi di cliente: **solo l'admin le gestisce** |
-| **Ruoli e permessi** | Ruoli personalizzabili con permessi granulari; 4 ruoli già pronti |
+| **Ruoli e permessi** | Ruoli personalizzabili con permessi granulari; 4 ruoli operativi e un ruolo Cliente |
 | **Registro attività** | Chi ha cambiato prezzi, utenti, ruoli, tipologiche, chi ha stornato una vendita |
 
 ## Tipologiche (tabelle di decodifica)
@@ -52,9 +53,10 @@ I permessi sono un elenco fisso nel codice (ogni permesso = una funzione); i **r
 | Ruolo (pronto all'uso) | Cosa fa |
 |---|---|
 | **Amministratore** | Tutto, sempre. È l'unico con utenti, ruoli e tipologiche. Non modificabile |
-| **Responsabile** | Gestisce il negozio: cassa, storni, carico, ordini, costi, report, registro. **Non** cambia i prezzi di listino, né utenti/ruoli/tipologiche |
-| **Commesso** | Vende (a prezzo di listino), registra scarti, clienti e prenotazioni. Non vede costi e margini |
+| **Responsabile** | Gestisce il negozio: prodotti e prezzi, cassa, storni, carico, ordini, costi, report, registro. Non gestisce utenti/ruoli/tipologiche |
+| **Cassiere** | Vende (a prezzo di listino), registra scarti, clienti e prenotazioni. Non vede costi e margini |
 | **Magazziniere** | Riceve la merce e gestisce gli ordini. Non usa la cassa |
+| **Cliente** | Si registra con email e password, consulta il catalogo e crea/consulta solo i propri ordini |
 
 Dall'app (*Altro → Ruoli e permessi*) puoi creare altri ruoli scegliendo i permessi. I permessi di amministrazione
 (`USERS_MANAGE`, `ROLES_MANAGE`, `LOOKUPS_MANAGE`) **non sono assegnabili** ad altri ruoli. Alcuni permessi ne richiedono altri
@@ -154,10 +156,31 @@ Il namespace, PVC, Deployment e Service sono definiti in `k8s/app.yaml`. Le imma
 pubblicate su GHCR e poi impostate sui Deployment usando il tag immutabile del commit; il workflow
 attende la fine dei rolling update.
 
-Le migrazioni **V3** e **V4** sono additive; V4 aggiunge il codice a barre facoltativo ai prodotti.
-Prima del rilascio su un database esistente fai un backup. Backend e frontend vengono aggiornati
-insieme perché alcune API sono cambiate; Flyway applica le migrazioni all'avvio del backend.
-Verifica le aliquote IVA prima di usare dati reali.
+Le migrazioni **V3–V6** aggiungono tipologiche e funzionalità senza cancellare i dati esistenti; V4 aggiunge
+il codice a barre, V5 aggiunge collegamento vendite-clienti, chiusura contanti e rettifiche inventario,
+V6 aggiunge account email collegati ai clienti. Prima di aggiornare un database già usato, fai un backup. Flyway applica le migrazioni
+all'avvio del backend. Verifica le aliquote IVA prima di usare dati reali.
+
+Gli account dipendenti si creano da **Altro → Utenti** con password temporanea e ruolo; l'email è facoltativa
+per gli utenti esistenti e diventa un metodo di accesso aggiuntivo. Il portale clienti permette invece
+la registrazione autonoma: l'account riceve solo i permessi `CATALOG_READ`, `CUSTOMER_ORDER_CREATE` e
+`CUSTOMER_ORDER_READ`, e il backend associa ogni ordine al cliente autenticato. Le richieste dei clienti
+restano in stato **Nuovo** finché il negozio non le conferma. Per ora non è configurata la verifica email:
+un cliente può accedere subito dopo essersi registrato.
+
+## Pubblicare la PWA su Render
+
+Il frontend React è statico e installabile come PWA; per login e dati ha comunque bisogno del backend Spring e di PostgreSQL. Il file `render.yaml` definisce frontend statico, API e database nella regione di Francoforte. Il frontend riceve un URL HTTPS `onrender.com`, quindi il dominio personalizzato è facoltativo.
+
+1. Crea un account Render e collega il repository GitHub.
+2. Da Render scegli **New → Blueprint**, seleziona questo repository e conferma `render.yaml`.
+3. Inserisci una password robusta per `ADMIN_PASSWORD` quando richiesta. Render genera `JWT_SECRET` e le credenziali del database.
+4. Attendi il completamento di frontend, backend e PostgreSQL, poi apri l'URL `onrender.com` del frontend.
+5. Accedi come `admin` usando la password inserita e cambiala al primo accesso. Il Blueprint configura il deploy dopo i controlli GitHub.
+
+La configurazione usa il piano backend da 2 GB e PostgreSQL da 1 GB: ai prezzi Render consultati a novembre 2026 sono circa **$44 al mese complessivi**; il frontend statico non ha un costo di compute. Possono aggiungersi IVA, traffico oltre la quota inclusa e spazio database. La stima cambia se Render aggiorna i prezzi. I piani gratuiti vanno bene per una prova, non per dati di negozio: il database gratuito scade dopo 30 giorni e i servizi gratuiti possono fermarsi.
+
+Per installarla sul telefono apri l'URL HTTPS: su Android usa **Installa app** nel menu di Chrome; su iPhone usa **Condividi → Aggiungi alla schermata Home**. La PWA conserva la shell dell'interfaccia, ma le vendite e gli altri dati richiedono la connessione al backend.
 
 ## Test locali
 

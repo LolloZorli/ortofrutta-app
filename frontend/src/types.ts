@@ -1,6 +1,7 @@
 // ---------- utenti, ruoli, permessi ----------
 export interface Profile {
   username: string
+  email: string | null
   roleCode: string
   roleName: string
   permissions: string[]
@@ -10,10 +11,20 @@ export interface Profile {
 export interface UserAccount {
   id: number
   username: string
+  email: string | null
   roleId: number
   roleName: string
   enabled: boolean
   mustChangePassword: boolean
+}
+
+export interface CatalogItem { id: number; name: string; category: string; unit: string; salePrice: number }
+
+export interface CustomerOrderLine { id: number; productId: number; productName: string; unit: string; quantity: number; unitPrice: number }
+export interface CustomerOrder {
+  id: number; customerId: number; customerName: string; customerPhone: string | null
+  status: 'NEW' | 'READY' | 'PICKED_UP' | 'CANCELLED'; pickupDate: string; notes: string | null
+  createdAt: string; lines: CustomerOrderLine[]; total: number
 }
 
 export interface RoleInfo {
@@ -35,6 +46,7 @@ export interface PermissionInfo {
 
 export interface RoleOption {
   id: number
+  code: string
   name: string
 }
 

@@ -45,6 +45,7 @@ export default function UsersPage() {
                     {u.username} {isMe && <span className="muted">(tu)</span>}
                   </div>
                   <div className="item-sub">{u.roleName}</div>
+                  {u.email && <div className="item-sub">{u.email}</div>}
                 </div>
                 <div className="row">
                   {u.mustChangePassword && <Chip tone="orange">password temporanea</Chip>}
@@ -88,10 +89,11 @@ function RoleSelect({ roles, value, onChange }: { roles: RoleOption[]; value: nu
 function NewUserForm({ roles, onClose, onDone }: { roles: RoleOption[]; onClose: () => void; onDone: () => void }) {
   const toast = useToast()
   const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [roleId, setRoleId] = useState<number | ''>('')
   const [busy, setBusy] = useState(false)
-  const fallback: number | '' = roles.find((r) => r.name === 'Commesso')?.id ?? (roles.length > 0 ? roles[0].id : '')
+  const fallback: number | '' = roles.find((r) => r.code === 'STAFF')?.id ?? (roles.length > 0 ? roles[0].id : '')
   const role: number | '' = roleId === '' ? fallback : roleId
 
   async function submit(e: FormEvent) {
@@ -100,7 +102,7 @@ function NewUserForm({ roles, onClose, onDone }: { roles: RoleOption[]; onClose:
     if (role === '') return toast.error('Scegli il ruolo')
     setBusy(true)
     try {
-      await api.post('/users', { username: username.trim(), password, roleId: role })
+      await api.post('/users', { username: username.trim(), email: email.trim() || null, password, roleId: role })
       toast.ok('Utente creato')
       onDone()
     } catch (err) {
@@ -114,6 +116,9 @@ function NewUserForm({ roles, onClose, onDone }: { roles: RoleOption[]; onClose:
       <form className="stack" onSubmit={submit}>
         <Field label="Nome utente" hint="Lettere, numeri, punto, trattino e underscore">
           <input value={username} onChange={(e) => setUsername(e.target.value)} autoCapitalize="none" required autoFocus />
+        </Field>
+        <Field label="Email (facoltativa)" hint="Può essere usata anche per accedere">
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
         </Field>
         <Field label="Ruolo">
           <RoleSelect roles={roles} value={role} onChange={setRoleId} />

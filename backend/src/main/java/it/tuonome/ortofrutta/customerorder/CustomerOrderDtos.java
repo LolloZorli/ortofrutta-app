@@ -32,6 +32,12 @@ public final class CustomerOrderDtos {
     ) {
     }
 
+    public record CustomerRequest(@NotNull LocalDate pickupDate, @Size(max = 500) String notes,
+                                  @NotEmpty @Valid List<CustomerLineRequest> lines) { }
+
+    public record CustomerLineRequest(@NotNull Long productId,
+                                      @NotNull @DecimalMin("0.001") BigDecimal quantity) { }
+
     /** Al ritiro la prenotazione diventa una vendita: serve il metodo di pagamento. */
     public record PickupRequest(@NotNull Long paymentMethodId) {
     }

@@ -23,6 +23,7 @@ const UsersPage = lazy(() => import('./pages/UsersPage'))
 const RolesPage = lazy(() => import('./pages/RolesPage'))
 const LookupsPage = lazy(() => import('./pages/LookupsPage'))
 const MorePage = lazy(() => import('./pages/MorePage'))
+const CustomerPortalPage = lazy(() => import('./pages/CustomerPortalPage'))
 
 /** Pagina riservata a chi ha almeno uno di questi permessi (il server li impone comunque). */
 function Guard({ perm, children }: { perm: string | string[]; children: ReactElement }) {
@@ -43,7 +44,8 @@ export default function App() {
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route element={<Layout />}>
-            <Route index element={<DashboardPage />} />
+            <Route index element={profile.roleCode === 'CUSTOMER' ? <Navigate to="/area-clienti" replace /> : <DashboardPage />} />
+            <Route path="area-clienti" element={<Guard perm="CUSTOMER_ORDER_READ"><CustomerPortalPage /></Guard>} />
             <Route path="altro" element={<MorePage />} />
 
             <Route path="cassa" element={<Guard perm="SALES_CREATE"><CassaPage /></Guard>} />

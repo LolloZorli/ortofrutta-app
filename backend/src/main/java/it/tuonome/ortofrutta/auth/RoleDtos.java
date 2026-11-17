@@ -30,6 +30,6 @@ public final class RoleDtos {
     }
 
     /** Elemento per la tendina "ruolo" nel modulo utenti. */
-    public record Option(Long id, String name) {
+    public record Option(Long id, String code, String name) {
     }
 }

@@ -21,6 +21,12 @@ public class AuthController {
         return service.login(request);
     }
 
+    @PostMapping("/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void register(@Valid @RequestBody AuthDtos.CustomerRegistrationRequest request) {
+        service.registerCustomer(request);
+    }
+
     @GetMapping("/me")
     public AuthDtos.Profile me(@AuthenticationPrincipal Jwt jwt) {
         return service.profile(jwt.getSubject());
