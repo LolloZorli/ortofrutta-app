@@ -82,6 +82,7 @@ export interface LookupTypeInfo {
 export interface Product {
   id: number
   name: string
+  barcode: string | null
   categoryId: number
   category: string
   unitId: number
@@ -219,6 +220,8 @@ export interface Sale {
   voidedBy: string | null
   voidReason: string | null
   lines: SaleLine[]
+    customerId: number | null
+    customerName: string | null
 }
 
 // ---------- report ----------
@@ -230,6 +233,8 @@ export interface LowStockItem {
   minStock: number
   suggestedQuantity: number
   lastUnitCost: number | null
+    averageDailySales: number
+    daysOfStock: number | null
 }
 
 export interface ExpiringLot {

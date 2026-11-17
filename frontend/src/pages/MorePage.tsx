@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth'
 import ChangePasswordForm from '../components/ChangePasswordForm'
+import InstallApp from '../components/InstallApp'
 import Modal from '../components/Modal'
 import { Chip } from '../components/ui'
 
@@ -41,6 +42,8 @@ export default function MorePage() {
           ))}
         </div>
       )}
+
+      <InstallApp />
 
       <div className="card stack">
         <div className="row between">

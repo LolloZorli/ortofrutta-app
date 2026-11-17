@@ -64,10 +64,13 @@ public class SecurityConfig {
                                 .hasAuthority("STOCK_READ")
                         .requestMatchers("/api/stock/receipts").hasAuthority("STOCK_RECEIVE")
                         .requestMatchers("/api/stock/waste").hasAuthority("WASTE_CREATE")
+                        .requestMatchers("/api/stock/count").hasAuthority("STOCK_RECEIVE")
 
                         // cassa
                         .requestMatchers(HttpMethod.POST, "/api/sales").hasAuthority("SALES_CREATE")
                         .requestMatchers(HttpMethod.POST, "/api/sales/*/void").hasAuthority("SALES_VOID")
+                        .requestMatchers(HttpMethod.GET, "/api/sales/customer/**")
+                                .hasAnyAuthority("CUSTOMERS_MANAGE", "RESERVATIONS_MANAGE", "REPORTS_VIEW")
                         .requestMatchers(HttpMethod.GET, "/api/sales", "/api/sales/*")
                                 .hasAnyAuthority("SALES_CREATE", "SALES_VOID", "REPORTS_VIEW")
 
@@ -78,7 +81,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/customer-orders/**").hasAuthority("RESERVATIONS_MANAGE")
 
                         // report (la dashboard e le tipologiche in lettura sono per tutti gli utenti attivi)
-                        .requestMatchers("/api/reports/products", "/api/reports/corrispettivi")
+                        .requestMatchers("/api/reports/products", "/api/reports/corrispettivi", "/api/reports/cash-closing")
                                 .hasAuthority("REPORTS_VIEW")
                         .requestMatchers("/api/reports/reorder-suggestions")
                                 .hasAnyAuthority("SUPPLIER_ORDERS_MANAGE", "REPORTS_VIEW")

@@ -22,6 +22,8 @@ public class Sale {
 
     private Long paymentMethodId;
 
+    private Long customerId;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
@@ -40,9 +42,10 @@ public class Sale {
     protected Sale() {
     }
 
-    public Sale(String createdBy, Long paymentMethodId) {
+    public Sale(String createdBy, Long paymentMethodId, Long customerId) {
         this.createdBy = createdBy;
         this.paymentMethodId = paymentMethodId;
+        this.customerId = customerId;
     }
 
     public void setTotal(BigDecimal total) { this.total = total; }
@@ -58,6 +61,7 @@ public class Sale {
     public Instant getCreatedAt() { return createdAt; }
     public String getCreatedBy() { return createdBy; }
     public Long getPaymentMethodId() { return paymentMethodId; }
+    public Long getCustomerId() { return customerId; }
     public BigDecimal getTotal() { return total; }
     public SaleStatus getStatus() { return status; }
     public Instant getVoidedAt() { return voidedAt; }

@@ -113,6 +113,35 @@ public class StockService {
         return consume(p, scale(quantity), MovementType.WASTE, null, reasonName, null, reasonId);
     }
 
+    @Transactional
+    public BigDecimal inventoryCount(Long productId, BigDecimal countedQuantity) {
+        Product p = findProduct(productId);
+        checkQuantity(p, countedQuantity);
+        BigDecimal target = scale(countedQuantity);
+        List<Lot> available = lots.findAvailableForUpdate(productId);
+        BigDecimal current = available.stream().map(Lot::getRemainingQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal delta = target.subtract(current);
+        if (delta.signum() > 0) {
+            BigDecimal cost = available.isEmpty() ? BigDecimal.ZERO : available.get(available.size() - 1).getUnitCost();
+            Lot lot = lots.save(new Lot(p, null, LocalDate.now(), null, delta, cost));
+            StockMovement movement = new StockMovement(p, lot, MovementType.ADJUSTMENT, delta, null, cost, "Conteggio inventario: incremento");
+            movement.tag(null, null, null, CurrentUser.name());
+            movements.save(movement);
+        } else if (delta.signum() < 0) {
+            BigDecimal remove = delta.abs();
+            for (Lot lot : available) {
+                if (remove.signum() == 0) break;
+                BigDecimal take = lot.getRemainingQuantity().min(remove);
+                lot.consume(take);
+                StockMovement movement = new StockMovement(p, lot, MovementType.ADJUSTMENT, take, null, lot.getUnitCost(), "Conteggio inventario: decremento");
+                movement.tag(null, null, null, CurrentUser.name());
+                movements.save(movement);
+                remove = remove.subtract(take);
+            }
+        }
+        return target;
+    }
+
     // ---------- logica FIFO ----------
 
     private List<StockMovement> consume(Product p, BigDecimal quantity, MovementType type, BigDecimal unitPrice,

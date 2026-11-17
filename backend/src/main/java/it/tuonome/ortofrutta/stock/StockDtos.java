@@ -31,6 +31,8 @@ public final class StockDtos {
     ) {
     }
 
+    public record CountRequest(@NotNull Long productId, @NotNull @DecimalMin("0.00") BigDecimal countedQuantity) { }
+
     /** "unit" è l'etichetta breve dell'unità di misura (kg, pz...). */
     public record LotResponse(
             Long id, Long productId, String productName, String unit,

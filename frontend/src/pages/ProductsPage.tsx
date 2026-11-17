@@ -22,7 +22,7 @@ export default function ProductsPage() {
   if (error || !data) return <ErrorBox message={error ?? 'Nessun dato'} onRetry={reload} />
 
   const q = search.trim().toLowerCase()
-  const rows = data.filter((p) => !q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
+  const rows = data.filter((p) => !q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || p.barcode?.toLowerCase().includes(q))
 
   async function toggleActive(p: Product) {
     try {
@@ -34,10 +34,19 @@ export default function ProductsPage() {
     }
   }
 
+  function printLabels() {
+    const printable = rows.filter((p) => p.active).map((p) => `<article><strong>${escapeHtml(p.name)}</strong><b>${eur(p.salePrice)} / ${escapeHtml(p.unit)}</b>${p.origin ? `<small>Origine: ${escapeHtml(p.origin)}</small>` : ''}${p.barcode ? `<small>${escapeHtml(p.barcode)}</small>` : ''}</article>`).join('')
+    const win = window.open('', '_blank', 'width=900,height=700')
+    if (!win) return toast.error('Consenti i popup per stampare i cartellini')
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Cartellini prezzi</title><style>body{font:16px Arial;margin:12mm}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8mm}article{border:1px solid #999;border-radius:8px;padding:8mm;min-height:30mm;display:flex;flex-direction:column;gap:5px;break-inside:avoid}strong{font-size:18px}b{font-size:21px;color:#176b3a}small{color:#555}@media print{button{display:none}}</style></head><body><button onclick="print()">Stampa</button><div class="grid">${printable}</div></body></html>`)
+    win.document.close()
+  }
+
   return (
     <div className="stack">
       <div className="row">
         <input className="grow" placeholder="Cerca prodotto…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <button className="btn" onClick={printLabels}>Stampa cartellini</button>
         <button className="btn btn-primary" onClick={() => setEditing('new')}>
           + Nuovo
         </button>
@@ -66,6 +75,7 @@ export default function ProductsPage() {
                     {p.origin ? ` · ${p.origin}` : ''}
                     {p.vatRate !== null ? ` · IVA ${p.vatRate}%` : ''}
                   </div>
+                  {p.barcode && <div className="item-sub">Codice a barre · {p.barcode}</div>}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <strong>
@@ -105,9 +115,14 @@ export default function ProductsPage() {
   )
 }
 
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] ?? ch))
+}
+
 function toRequest(p: Product) {
   return {
     name: p.name,
+    barcode: p.barcode,
     categoryId: p.categoryId,
     unitId: p.unitId,
     salePrice: p.salePrice,
@@ -121,6 +136,7 @@ function ProductForm({ product, onClose, onSaved }: { product: Product | null; o
   const toast = useToast()
   const { lookups } = useLookups()
   const [name, setName] = useState(product?.name ?? '')
+  const [barcode, setBarcode] = useState(product?.barcode ?? '')
   const [categoryId, setCategoryId] = useState<number | ''>(product?.categoryId ?? lookups.CATEGORY[0]?.id ?? '')
   const [unitId, setUnitId] = useState<number | ''>(product?.unitId ?? lookups.UNIT[0]?.id ?? '')
   const [vatRateId, setVatRateId] = useState<number | ''>(product?.vatRateId ?? lookups.VAT_RATE[0]?.id ?? '')
@@ -148,6 +164,7 @@ function ProductForm({ product, onClose, onSaved }: { product: Product | null; o
     try {
       const body = {
         name: name.trim(),
+        barcode: barcode.trim() || null,
         categoryId,
         unitId,
         salePrice,
@@ -181,6 +198,15 @@ function ProductForm({ product, onClose, onSaved }: { product: Product | null; o
       <form className="stack" onSubmit={submit}>
         <Field label="Nome">
           <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+        </Field>
+        <Field label="Codice a barre (facoltativo)" hint="Puoi inserirlo a mano o con uno scanner che funziona come tastiera">
+          <input
+            value={barcode}
+            onChange={(e) => setBarcode(e.target.value)}
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={32}
+          />
         </Field>
         <Field label="Categoria">{select(categoryId, setCategoryId, categories)}</Field>
         <div className="row">

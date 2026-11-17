@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/sales")
@@ -36,6 +37,11 @@ public class SaleController {
     public SaleDtos.Response get(@PathVariable Long id, Authentication auth) {
         boolean seesAll = Authz.has(auth, Permission.REPORTS_VIEW) || Authz.has(auth, Permission.SALES_VOID);
         return service.get(id, !seesAll);
+    }
+
+    @GetMapping("/customer/{customerId}")
+    public List<SaleDtos.Response> customerHistory(@PathVariable Long customerId) {
+        return service.customerHistory(customerId);
     }
 
     @PostMapping("/{id}/void")

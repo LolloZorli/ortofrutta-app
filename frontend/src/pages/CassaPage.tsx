@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type KeyboardEvent } from 'react'
 import { api, errorMessage } from '../api'
 import { useAuth } from '../auth'
+import BarcodeScanner from '../components/BarcodeScanner'
 import Modal from '../components/Modal'
 import { Chip, Empty, ErrorBox, Field, Loading } from '../components/ui'
 import { dateTimeIt, eur, parseDecimal, qty } from '../format'
 import { useLoad, usePaged } from '../hooks'
 import { useLookups } from '../lookups'
 import { useToast } from '../toast'
-import type { PageResponse, Product, Sale } from '../types'
+import type { Customer, PageResponse, Product, Sale } from '../types'
 
 interface CartLine {
   productId: number
@@ -41,9 +42,13 @@ function Register() {
   const { lookups } = useLookups()
   const canOverride = can('SALES_PRICE_OVERRIDE')
   const products = useLoad<Product[]>(() => api.get('/products'))
+  const canSelectCustomer = can('CUSTOMERS_MANAGE') || can('RESERVATIONS_MANAGE')
+  const customers = useLoad<Customer[]>(() => canSelectCustomer ? api.get('/customers') : Promise.resolve([]), [canSelectCustomer])
   const [search, setSearch] = useState('')
+  const [cameraOpen, setCameraOpen] = useState(false)
   const [cart, setCart] = useState<CartLine[]>([])
   const [paymentId, setPaymentId] = useState<number | null>(null)
+  const [customerId, setCustomerId] = useState('')
   const [busy, setBusy] = useState(false)
 
   const list = products.data ?? []
@@ -55,7 +60,7 @@ function Register() {
   if (products.error || !products.data) return <ErrorBox message={products.error ?? 'Nessun dato'} onRetry={products.reload} />
 
   const q = search.trim().toLowerCase()
-  const visible = list.filter((p) => !q || p.name.toLowerCase().includes(q))
+  const visible = list.filter((p) => !q || p.name.toLowerCase().includes(q) || p.barcode?.toLowerCase().includes(q))
 
   function add(p: Product) {
     setCart((c) => {
@@ -66,6 +71,30 @@ function Register() {
       }
       return [...c, { productId: p.id, quantity: '1', price: String(p.salePrice) }]
     })
+  }
+
+  function addScannedBarcode(code: string) {
+    const product = list.find((p) => p.barcode?.trim().toLowerCase() === code.trim().toLowerCase())
+    setCameraOpen(false)
+    if (!product) {
+      setSearch(code)
+      return toast.error(`Nessun prodotto associato al codice ${code}`)
+    }
+    if (product.stock <= 0) return toast.error(`${product.name}: prodotto esaurito`)
+    add(product)
+    setSearch('')
+    toast.ok(`${product.name} aggiunto al carrello`)
+  }
+
+  function onSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter') return
+    const code = search.trim()
+    const product = list.find((p) => p.barcode?.trim().toLowerCase() === code.toLowerCase())
+    if (!product) return
+    event.preventDefault()
+    if (product.stock <= 0) return toast.error(`${product.name}: prodotto esaurito`)
+    add(product)
+    setSearch('')
   }
 
   function setLine(productId: number, patch: Partial<CartLine>) {
@@ -100,9 +129,10 @@ function Register() {
     }
     setBusy(true)
     try {
-      const sale = await api.post<Sale>('/sales', { paymentMethodId: payment, items })
+      const sale = await api.post<Sale>('/sales', { paymentMethodId: payment, customerId: customerId ? Number(customerId) : null, items })
       toast.ok(`Incassati ${eur(sale.total)}`)
       setCart([])
+      setCustomerId('')
       products.reload()
     } catch (e) {
       toast.error(errorMessage(e))
@@ -173,13 +203,29 @@ function Register() {
               </button>
             ))}
           </div>
+          {canSelectCustomer && <label className="field"><span>Cliente (facoltativo)</span><select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+            <option value="">Vendita senza cliente</option>
+            {(customers.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}{c.phone ? ` · ${c.phone}` : ''}</option>)}
+          </select></label>}
           <button className="btn btn-primary btn-block" disabled={busy} onClick={pay}>
             Incassa {eur(total)}
           </button>
         </div>
       )}
 
-      <input placeholder="Cerca prodotto…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="row barcode-search">
+        <input
+          className="grow"
+          placeholder="Cerca nome o codice a barre…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={onSearchKeyDown}
+          aria-label="Cerca prodotto o scansiona un codice a barre"
+        />
+        <button className="btn barcode-scan-button" type="button" onClick={() => setCameraOpen(true)}>
+          Scansiona
+        </button>
+      </div>
       {visible.length === 0 ? (
         <Empty>Nessun prodotto.</Empty>
       ) : (
@@ -203,6 +249,7 @@ function Register() {
           })}
         </div>
       )}
+      {cameraOpen && <BarcodeScanner onDetected={addScannedBarcode} onClose={() => setCameraOpen(false)} />}
     </div>
   )
 }
@@ -236,7 +283,7 @@ function SalesList() {
             <div>
               <div className="item-title">{eur(s.total)}</div>
               <div className="item-sub">
-                {dateTimeIt(s.createdAt)} · {s.createdBy ?? '—'} · {s.paymentMethod ?? 'n/d'}
+                {dateTimeIt(s.createdAt)} · {s.createdBy ?? '—'} · {s.paymentMethod ?? 'n/d'}{s.customerName ? ` · ${s.customerName}` : ''}
               </div>
             </div>
             {s.status === 'VOIDED' ? <Chip tone="red">stornata</Chip> : <Chip tone="green">ok</Chip>}

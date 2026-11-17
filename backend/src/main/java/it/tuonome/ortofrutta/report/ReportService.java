@@ -1,5 +1,6 @@
 package it.tuonome.ortofrutta.report;
 
+import it.tuonome.ortofrutta.common.CurrentUser;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,6 +73,9 @@ public class ReportService {
         return jdbc.sql("""
                 select p.id, p.name, u.short_label, p.min_stock,
                        coalesce(sum(l.remaining_quantity), 0) as stock,
+                       coalesce((select sum(sm.quantity) / 30.0 from stock_movements sm
+                         where sm.product_id=p.id and sm.type='SALE' and not sm.voided
+                         and sm.created_at >= now() - interval '30 days'), 0) as daily_sales,
                        (select l2.unit_cost from lots l2 where l2.product_id = p.id
                          order by l2.received_at desc, l2.id desc limit 1) as last_cost
                 from products p
@@ -84,10 +88,13 @@ public class ReportService {
                 """).query((rs, n) -> {
             BigDecimal min = rs.getBigDecimal("min_stock");
             BigDecimal stock = rs.getBigDecimal("stock");
-            BigDecimal suggested = min.multiply(BigDecimal.valueOf(2)).subtract(stock)
+            BigDecimal daily = rs.getBigDecimal("daily_sales");
+            BigDecimal target = min.multiply(BigDecimal.valueOf(2)).max(daily.multiply(BigDecimal.valueOf(7)));
+            BigDecimal suggested = target.subtract(stock)
                     .max(BigDecimal.ZERO).setScale(3, RoundingMode.HALF_UP);
             return new ReportDtos.LowStockItem(rs.getLong("id"), rs.getString("name"),
-                    rs.getString("short_label"), stock, min, suggested, rs.getBigDecimal("last_cost"));
+                    rs.getString("short_label"), stock, min, suggested, rs.getBigDecimal("last_cost"),
+                    daily.setScale(3, RoundingMode.HALF_UP), daily.signum() == 0 ? null : stock.divide(daily, 1, RoundingMode.HALF_UP));
         }).list();
     }
 
@@ -202,6 +209,35 @@ public class ReportService {
         BigDecimal net = byVat.stream().map(ReportDtos.VatRow::net).reduce(BigDecimal.ZERO, BigDecimal::add);
         return new ReportDtos.Corrispettivi(date, gross, net, gross.subtract(net),
                 salesCounts[0], salesCounts[1], voidedTotal, byVat, byPayment);
+    }
+
+    public ReportDtos.CashClosing cashClosing(LocalDate date) {
+        return jdbc.sql("select expected_cash, counted_cash, note, closed_by, closed_at from cash_closings where closing_date=:date")
+                .param("date", date).query((rs, n) -> closing(rs.getBigDecimal("expected_cash"),
+                        rs.getBigDecimal("counted_cash"), rs.getString("note"), rs.getString("closed_by"),
+                        rs.getTimestamp("closed_at").toInstant())).optional().orElse(null);
+    }
+
+    @Transactional
+    public ReportDtos.CashClosing saveCashClosing(LocalDate date, ReportDtos.CashClosingRequest request) {
+        BigDecimal expected = jdbc.sql("""
+                select coalesce(sum(s.total),0) from sales s join payment_methods pm on pm.id=s.payment_method_id
+                where s.status='COMPLETED' and s.created_at >= :from and s.created_at < :to and pm.code='CASH'
+                """).param("from", Timestamp.from(date.atStartOfDay(ZONE).toInstant()))
+                .param("to", Timestamp.from(date.plusDays(1).atStartOfDay(ZONE).toInstant()))
+                .query(BigDecimal.class).single();
+        jdbc.sql("""
+                insert into cash_closings(closing_date,expected_cash,counted_cash,note,closed_by)
+                values(:date,:expected,:counted,:note,:user)
+                on conflict(closing_date) do update set expected_cash=excluded.expected_cash,
+                counted_cash=excluded.counted_cash,note=excluded.note,closed_by=excluded.closed_by,closed_at=now()
+                """).param("date", date).param("expected", expected).param("counted", request.countedCash())
+                .param("note", request.note()).param("user", CurrentUser.name()).update();
+        return cashClosing(date);
+    }
+
+    private static ReportDtos.CashClosing closing(BigDecimal expected, BigDecimal counted, String note, String user, Instant at) {
+        return new ReportDtos.CashClosing(expected, counted, counted.subtract(expected), note, user, at);
     }
 
     // ---------- utilità ----------

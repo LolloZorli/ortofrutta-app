@@ -26,7 +26,8 @@ public final class SaleDtos {
 
     public record CheckoutRequest(
             @NotNull Long paymentMethodId,
-            @NotEmpty @Valid List<ItemRequest> items
+            @NotEmpty @Valid List<ItemRequest> items,
+            Long customerId
     ) {
     }
 
@@ -39,6 +40,6 @@ public final class SaleDtos {
     /** In elenco "lines" è vuoto; nel dettaglio e nella risposta di cassa contiene le righe. */
     public record Response(Long id, Instant createdAt, String createdBy, String paymentMethod,
                            BigDecimal total, SaleStatus status, Instant voidedAt, String voidedBy,
-                           String voidReason, List<Line> lines) {
+                           String voidReason, List<Line> lines, Long customerId, String customerName) {
     }
 }

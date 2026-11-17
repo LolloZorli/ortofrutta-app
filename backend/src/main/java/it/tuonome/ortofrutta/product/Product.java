@@ -15,6 +15,9 @@ public class Product {
     @Column(nullable = false, length = 120)
     private String name;
 
+    @Column(length = 32)
+    private String barcode;
+
     /** Riferimenti alle tipologiche (chiavi esterne nel database): categoria, unità, origine, aliquota IVA. */
     @Column(nullable = false)
     private Long categoryId;
@@ -41,12 +44,23 @@ public class Product {
 
     public Product(String name, Long categoryId, Long unitId, BigDecimal salePrice,
                    BigDecimal minStock, Long originId, Long vatRateId) {
-        update(name, categoryId, unitId, salePrice, minStock, originId, vatRateId);
+        this(name, categoryId, unitId, salePrice, minStock, originId, vatRateId, null);
+    }
+
+    public Product(String name, Long categoryId, Long unitId, BigDecimal salePrice,
+                   BigDecimal minStock, Long originId, Long vatRateId, String barcode) {
+        update(name, categoryId, unitId, salePrice, minStock, originId, vatRateId, barcode);
     }
 
     public void update(String name, Long categoryId, Long unitId, BigDecimal salePrice,
                        BigDecimal minStock, Long originId, Long vatRateId) {
+        update(name, categoryId, unitId, salePrice, minStock, originId, vatRateId, null);
+    }
+
+    public void update(String name, Long categoryId, Long unitId, BigDecimal salePrice,
+                       BigDecimal minStock, Long originId, Long vatRateId, String barcode) {
         this.name = name.trim();
+        this.barcode = barcode == null || barcode.isBlank() ? null : barcode.trim();
         this.categoryId = categoryId;
         this.unitId = unitId;
         this.salePrice = salePrice;
@@ -59,6 +73,7 @@ public class Product {
 
     public Long getId() { return id; }
     public String getName() { return name; }
+    public String getBarcode() { return barcode; }
     public Long getCategoryId() { return categoryId; }
     public Long getUnitId() { return unitId; }
     public Long getOriginId() { return originId; }

@@ -34,6 +34,7 @@ function ProductsTab() {
   const { can } = useAuth()
   const [search, setSearch] = useState('')
   const [action, setAction] = useState<Action | null>(null)
+  const [countProduct, setCountProduct] = useState<Product | null>(null)
   const { data, loading, error, reload } = useLoad<Product[]>(() => api.get('/products'))
 
   if (loading && !data) return <Loading />
@@ -64,7 +65,7 @@ function ProductsTab() {
                 </div>
                 <Chip tone={p.stock <= 0 ? 'red' : p.lowStock ? 'orange' : 'green'}>{qty(p.stock, p.unit)}</Chip>
               </div>
-              {(canWaste || canReceive) && (
+              {(canWaste || canReceive || can('STOCK_RECEIVE')) && (
                 <div className="row" style={{ marginTop: 10 }}>
                   {canWaste && (
                     <button className="btn btn-sm grow" onClick={() => setAction({ kind: 'waste', product: p })}>
@@ -76,6 +77,7 @@ function ProductsTab() {
                       Carico
                     </button>
                   )}
+                  {can('STOCK_RECEIVE') && <button className="btn btn-sm grow" onClick={() => setCountProduct(p)}>Conteggio</button>}
                 </div>
               )}
             </div>
@@ -92,8 +94,28 @@ function ProductsTab() {
           }}
         />
       )}
+      {countProduct && <InventoryCountModal product={countProduct} onClose={() => setCountProduct(null)} onDone={() => { setCountProduct(null); reload() }} />}
     </div>
   )
+}
+
+function InventoryCountModal({ product, onClose, onDone }: { product: Product; onClose: () => void; onDone: () => void }) {
+  const [quantity, setQuantity] = useState(String(product.stock))
+  const [busy, setBusy] = useState(false)
+  const toast = useToast()
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    const countedQuantity = parseDecimal(quantity)
+    if (!(countedQuantity >= 0) || (!product.allowDecimals && !Number.isInteger(countedQuantity))) return toast.error('Quantità contata non valida')
+    setBusy(true)
+    try { await api.post('/stock/count', { productId: product.id, countedQuantity }); toast.ok('Giacenza aggiornata e registrata nei movimenti'); onDone() }
+    catch (e) { toast.error(errorMessage(e)); setBusy(false) }
+  }
+  return <Modal title={`Conteggio · ${product.name}`} onClose={onClose}><form className="stack" onSubmit={submit}>
+    <p className="muted">Giacenza registrata: {qty(product.stock, product.unit)}. Inserisci la quantità fisicamente presente.</p>
+    <Field label={`Quantità contata (${product.unit})`}><input autoFocus inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} /></Field>
+    <button className="btn btn-primary btn-block" disabled={busy}>Registra conteggio</button>
+  </form></Modal>
 }
 
 const PRESETS_DECIMAL = ['0.5', '1', '2', '5']

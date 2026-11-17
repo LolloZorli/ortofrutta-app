@@ -6,6 +6,8 @@ import { Chip, Empty, ErrorBox, Field, Loading } from '../components/ui'
 import { useLoad } from '../hooks'
 import { optionsWithCurrent, useLookups } from '../lookups'
 import { useToast } from '../toast'
+import type { Sale } from '../types'
+import { eur, dateTimeIt } from '../format'
 
 interface Contact {
   id: number
@@ -29,6 +31,7 @@ export default function ContactsPage({ kind }: { kind: Kind }) {
   const toast = useToast()
   const { can } = useAuth()
   const [editing, setEditing] = useState<Contact | 'new' | null>(null)
+  const [history, setHistory] = useState<{ customer: Contact; sales: Sale[] } | null>(null)
   const { data, loading, error, reload } = useLoad<Contact[]>(() => api.get(cfg.path), [kind])
 
   // I permessi decidono cosa si può fare: chi può solo consultare i fornitori non vede i pulsanti di modifica
@@ -47,6 +50,11 @@ export default function ContactsPage({ kind }: { kind: Kind }) {
     } catch (e) {
       toast.error(errorMessage(e))
     }
+  }
+
+  async function showHistory(c: Contact) {
+    try { setHistory({ customer: c, sales: await api.get<Sale[]>(`/sales/customer/${c.id}`) }) }
+    catch (e) { toast.error(errorMessage(e)) }
   }
 
   return (
@@ -79,6 +87,7 @@ export default function ContactsPage({ kind }: { kind: Kind }) {
                     Modifica
                   </button>
                 )}
+                {kind === 'customer' && <button className="btn btn-sm" onClick={() => showHistory(c)}>Storico acquisti</button>}
                 {canDelete && (
                   <button className="btn btn-sm btn-danger" onClick={() => remove(c)}>
                     Elimina
@@ -101,6 +110,9 @@ export default function ContactsPage({ kind }: { kind: Kind }) {
           }}
         />
       )}
+      {history && <Modal title={`Acquisti di ${history.customer.name}`} onClose={() => setHistory(null)}>
+        {history.sales.length === 0 ? <p className="muted">Nessuna vendita associata.</p> : <div className="list">{history.sales.map((s) => <div className="card row between" key={s.id}><span>{dateTimeIt(s.createdAt)} · {s.paymentMethod}</span><strong>{eur(s.total)}</strong></div>)}</div>}
+      </Modal>}
     </div>
   )
 }

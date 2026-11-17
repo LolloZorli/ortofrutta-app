@@ -8,6 +8,7 @@ import it.tuonome.ortofrutta.common.PageResponse;
 import it.tuonome.ortofrutta.lookup.LookupItem;
 import it.tuonome.ortofrutta.lookup.LookupService;
 import it.tuonome.ortofrutta.lookup.LookupType;
+import it.tuonome.ortofrutta.customer.CustomerRepository;
 import it.tuonome.ortofrutta.product.Product;
 import it.tuonome.ortofrutta.product.ProductRepository;
 import it.tuonome.ortofrutta.stock.MovementType;
@@ -40,10 +41,11 @@ public class SaleService {
     private final LookupService lookups;
     private final AuditService audit;
     private final JdbcClient jdbc;
+    private final CustomerRepository customers;
 
     public SaleService(SaleRepository sales, ProductRepository products, StockService stock,
                        StockMovementRepository movements, LookupService lookups,
-                       AuditService audit, JdbcClient jdbc) {
+                       AuditService audit, JdbcClient jdbc, CustomerRepository customers) {
         this.sales = sales;
         this.products = products;
         this.stock = stock;
@@ -51,6 +53,7 @@ public class SaleService {
         this.lookups = lookups;
         this.audit = audit;
         this.jdbc = jdbc;
+        this.customers = customers;
     }
 
     /** canOverridePrice: se false, il prezzo di ogni riga è sempre quello di listino. */
@@ -63,14 +66,22 @@ public class SaleService {
             BigDecimal price = canOverridePrice && i.unitPrice() != null ? i.unitPrice() : p.getSalePrice();
             items.add(new SaleItem(p.getId(), i.quantity(), price));
         }
-        return create(items, r.paymentMethodId());
+        if (r.customerId() != null && !customers.existsById(r.customerId())) {
+            throw new NotFoundException("Cliente", r.customerId());
+        }
+        return create(items, r.paymentMethodId(), r.customerId());
     }
 
     /** Crea la vendita con prezzi già decisi (usato dalla cassa e dal ritiro delle prenotazioni). */
     @Transactional
     public SaleDtos.Response create(List<SaleItem> items, Long paymentMethodId) {
+        return create(items, paymentMethodId, null);
+    }
+
+    @Transactional
+    public SaleDtos.Response create(List<SaleItem> items, Long paymentMethodId, Long customerId) {
         LookupItem method = lookups.requireActive(LookupType.PAYMENT_METHOD, paymentMethodId, "Metodo di pagamento");
-        Sale sale = sales.save(new Sale(CurrentUser.name(), method.id()));
+        Sale sale = sales.save(new Sale(CurrentUser.name(), method.id(), customerId));
         BigDecimal total = BigDecimal.ZERO;
         for (SaleItem item : items) {
             stock.sellProduct(item.productId(), item.quantity(), item.unitPrice(), sale.getId());
@@ -114,13 +125,25 @@ public class SaleService {
         return PageResponse.of(page, s -> toResponse(s, false));
     }
 
+    public List<SaleDtos.Response> customerHistory(Long customerId) {
+        if (!customers.existsById(customerId)) throw new NotFoundException("Cliente", customerId);
+        return sales.findAllByCustomerIdAndStatusOrderByCreatedAtDesc(customerId, SaleStatus.COMPLETED)
+                .stream().map(s -> toResponse(s, true)).toList();
+    }
+
     // ---------------------------------- interni ----------------------------------
 
     private SaleDtos.Response toResponse(Sale s, boolean withLines) {
         return new SaleDtos.Response(s.getId(), s.getCreatedAt(), s.getCreatedBy(),
                 lookups.name(LookupType.PAYMENT_METHOD, s.getPaymentMethodId()),
                 s.getTotal(), s.getStatus(), s.getVoidedAt(), s.getVoidedBy(), s.getVoidReason(),
-                withLines ? lines(s.getId()) : List.of());
+                withLines ? lines(s.getId()) : List.of(), s.getCustomerId(), customerName(s.getCustomerId()));
+    }
+
+    private String customerName(Long customerId) {
+        if (customerId == null) return null;
+        return jdbc.sql("select name from customers where id = :id").param("id", customerId)
+                .query(String.class).optional().orElse(null);
     }
 
     /** Righe riassunte per prodotto e prezzo (una vendita su più lotti genera più movimenti). */

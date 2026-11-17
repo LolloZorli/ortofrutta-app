@@ -49,4 +49,9 @@ public class StockController {
     public List<StockDtos.MovementResponse> discard(@Valid @RequestBody StockDtos.WasteRequest request) {
         return service.discard(request);
     }
+
+    @PostMapping("/count")
+    public java.math.BigDecimal inventoryCount(@Valid @RequestBody StockDtos.CountRequest request) {
+        return service.inventoryCount(request.productId(), request.countedQuantity());
+    }
 }

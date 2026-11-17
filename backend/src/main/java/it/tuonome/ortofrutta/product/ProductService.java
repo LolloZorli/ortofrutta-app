@@ -52,9 +52,11 @@ public class ProductService {
         if (products.existsByNameIgnoreCase(r.name().trim())) {
             throw new BusinessException("Esiste già un prodotto con questo nome");
         }
+        String barcode = normalizeBarcode(r.barcode());
+        validateBarcode(barcode, null);
         validateLookups(r, null);
         Product p = products.save(new Product(r.name(), r.categoryId(), r.unitId(), r.salePrice(),
-                r.minStock(), r.originId(), r.vatRateId()));
+                r.minStock(), r.originId(), r.vatRateId(), barcode));
         if (r.active() != null) {
             p.setActive(r.active());
         }
@@ -68,14 +70,20 @@ public class ProductService {
         if (products.existsByNameIgnoreCaseAndIdNot(r.name().trim(), id)) {
             throw new BusinessException("Esiste già un prodotto con questo nome");
         }
+        String barcode = normalizeBarcode(r.barcode());
+        validateBarcode(barcode, id);
         validateLookups(r, p);
         BigDecimal oldPrice = p.getSalePrice();
-        p.update(r.name(), r.categoryId(), r.unitId(), r.salePrice(), r.minStock(), r.originId(), r.vatRateId());
+        String oldBarcode = p.getBarcode();
+        p.update(r.name(), r.categoryId(), r.unitId(), r.salePrice(), r.minStock(), r.originId(), r.vatRateId(), barcode);
         if (r.active() != null) {
             p.setActive(r.active());
         }
         if (oldPrice.compareTo(p.getSalePrice()) != 0) {
             audit.record("PRICE_CHANGE", "PRODUCT", id, p.getName() + ": " + oldPrice + " → " + p.getSalePrice());
+        } else if (!java.util.Objects.equals(oldBarcode, barcode)) {
+            audit.record("PRODUCT_UPDATE", "PRODUCT", id, p.getName() + ": codice a barre " +
+                    (oldBarcode == null ? "assente" : oldBarcode) + " → " + (barcode == null ? "rimosso" : barcode));
         } else {
             audit.record("PRODUCT_UPDATE", "PRODUCT", id, p.getName());
         }
@@ -112,6 +120,19 @@ public class ProductService {
         lookups.requireActive(type, id, what);
     }
 
+    private String normalizeBarcode(String barcode) {
+        if (barcode == null || barcode.isBlank()) return null;
+        return barcode.trim();
+    }
+
+    private void validateBarcode(String barcode, Long currentId) {
+        if (barcode == null) return;
+        boolean duplicate = currentId == null
+                ? products.existsByBarcodeIgnoreCase(barcode)
+                : products.existsByBarcodeIgnoreCaseAndIdNot(barcode, currentId);
+        if (duplicate) throw new BusinessException("Questo codice a barre è già assegnato a un altro prodotto");
+    }
+
     private ProductDtos.Response toResponse(Product p, BigDecimal stock) {
         LookupItem unit = lookups.find(LookupType.UNIT, p.getUnitId());
         boolean low = p.getMinStock().signum() > 0 && stock.compareTo(p.getMinStock()) < 0;
@@ -122,7 +143,7 @@ public class ProductService {
                 p.getSalePrice(), p.getMinStock(),
                 p.getOriginId(), lookups.name(LookupType.ORIGIN, p.getOriginId()),
                 p.getVatRateId(), lookups.vatRate(p.getVatRateId()),
-                p.isActive(), stock, low);
+                p.isActive(), stock, low, p.getBarcode());
     }
 
     private Product find(Long id) {

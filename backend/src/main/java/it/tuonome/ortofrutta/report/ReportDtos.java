@@ -12,7 +12,8 @@ public final class ReportDtos {
     /** "unit" è sempre l'etichetta breve dell'unità di misura (kg, pz...). */
     public record LowStockItem(
             Long productId, String productName, String unit,
-            BigDecimal stock, BigDecimal minStock, BigDecimal suggestedQuantity, BigDecimal lastUnitCost
+            BigDecimal stock, BigDecimal minStock, BigDecimal suggestedQuantity, BigDecimal lastUnitCost,
+            BigDecimal averageDailySales, BigDecimal daysOfStock
     ) {
     }
 
@@ -45,7 +46,7 @@ public final class ReportDtos {
         public Dashboard restrict(boolean canSeeRevenue, boolean canSeeCosts) {
             List<LowStockItem> low = canSeeCosts ? lowStock : lowStock.stream()
                     .map(i -> new LowStockItem(i.productId(), i.productName(), i.unit(), i.stock(),
-                            i.minStock(), i.suggestedQuantity(), null))
+                            i.minStock(), i.suggestedQuantity(), null, i.averageDailySales(), i.daysOfStock()))
                     .toList();
             return new Dashboard(
                     canSeeRevenue ? todayRevenue : null,
@@ -72,6 +73,12 @@ public final class ReportDtos {
 
     public record PaymentRow(String method, BigDecimal gross, long sales) {
     }
+
+    public record CashClosing(BigDecimal expectedCash, BigDecimal countedCash, BigDecimal difference,
+                              String note, String closedBy, java.time.Instant closedAt) { }
+
+    public record CashClosingRequest(@jakarta.validation.constraints.NotNull @jakarta.validation.constraints.DecimalMin("0.00") BigDecimal countedCash,
+                                     @jakarta.validation.constraints.Size(max = 500) String note) { }
 
     /**
      * Riepilogo giornaliero degli incassi (corrispettivi) per aliquota IVA e per metodo di pagamento.

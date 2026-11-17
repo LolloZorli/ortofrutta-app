@@ -75,7 +75,7 @@ export default function DashboardPage() {
                 <div key={i.productId} className="dashboard-row">
                   <div className="dashboard-item-copy">
                     <div className="item-title">{i.productName}</div>
-                    <div className="item-sub">Disponibili {qty(i.stock, i.unit)} · minimo {qty(i.minStock, i.unit)}</div>
+                    <div className="item-sub">Disponibili {qty(i.stock, i.unit)} · minimo {qty(i.minStock, i.unit)}{i.daysOfStock !== null ? ` · circa ${i.daysOfStock} giorni` : ''}</div>
                   </div>
                   <Chip tone="red">+{qty(i.suggestedQuantity, i.unit)}</Chip>
                 </div>

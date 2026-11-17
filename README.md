@@ -10,12 +10,14 @@ Interfaccia pensata per il telefono, da usare con una mano dietro al banco.
 
 | Area | Funzioni |
 |---|---|
-| **Cassa** | Carrello con più prodotti, metodo di pagamento, incasso atomico (o passa tutto o niente), **storno** con ripristino della merce |
-| **Magazzino** | Giacenze, lotti con scadenza, carico merce, scarti con motivo, storico movimenti paginato con l'operatore |
+| **Cassa** | Carrello con più prodotti, ricerca per nome o codice a barre, lettore USB/Bluetooth e scansione fotocamera nei browser compatibili, cliente facoltativo, metodo di pagamento, incasso atomico e **storno** con ripristino della merce |
+| **Magazzino** | Giacenze, conteggio fisico con rettifica tracciata, lotti con scadenza, carico merce, scarti con motivo, storico movimenti paginato con l'operatore |
 | **Lotti FIFO** | Ogni arrivo è un lotto con costo e scadenza; le vendite consumano prima il più vecchio, così il margine è reale |
 | **Ordini fornitori** | Bozza, invio (link WhatsApp), arrivo merce con correzione di quantità/costo; precompilazione dai prodotti sotto scorta |
 | **Prenotazioni** | Nuova → Pronta → Ritirata. Il ritiro diventa una vendita di cassa con il suo metodo di pagamento |
-| **Corrispettivi** | Riepilogo giornaliero per aliquota IVA (imponibile e imposta scorporati) e per metodo di pagamento |
+| **Corrispettivi** | Riepilogo giornaliero per aliquota IVA (imponibile e imposta scorporati) e per metodo di pagamento; chiusura contanti con differenza tra atteso e contato |
+| **Clienti** | Anagrafica e storico acquisti associati alle vendite |
+| **Cartellini** | Stampa dei cartellini prezzo dei prodotti attivi e filtrati |
 | **Report** | Incasso, valore magazzino, margine, scarti, più venduti, lotti in scadenza, report per prodotto |
 | **Tipologiche** | Categorie, unità di misura, aliquote IVA, origini, motivi di scarto, metodi di pagamento, tipi di cliente: **solo l'admin le gestisce** |
 | **Ruoli e permessi** | Ruoli personalizzabili con permessi granulari; 4 ruoli già pronti |
@@ -113,8 +115,17 @@ Con il profilo `demo` esistono anche `commesso` / `commesso123`, `responsabile` 
 ### 2. Tutto in container
 
 ```bash
-docker compose --profile app up --build        # app su http://localhost:3000, API su :8080
+docker compose --profile app up --build        # app su http://localhost:3000, API su :8081
 ```
+
+### Installare l'app sul telefono
+
+Il frontend è una **PWA**: non serve scaricare un APK né pubblicarla su uno store. Apri l'indirizzo
+HTTPS dell'app dal telefono, poi usa **Installa app** nel menu di Chrome/Android oppure, su iPhone,
+**Condividi → Aggiungi alla schermata Home**. In *Altro* trovi il pulsante d'installazione quando il
+browser lo supporta. Il browser richiede HTTPS per installare; `localhost` vale solo sul dispositivo
+che esegue il browser, quindi per il telefono serve un indirizzo HTTPS raggiungibile dal telefono.
+L'interfaccia può aprirsi dalla cache, ma accesso, vendite e dati richiedono il backend raggiungibile.
 
 ## CI/CD e deploy su Kubernetes
 
@@ -143,9 +154,10 @@ Il namespace, PVC, Deployment e Service sono definiti in `k8s/app.yaml`. Le imma
 pubblicate su GHCR e poi impostate sui Deployment usando il tag immutabile del commit; il workflow
 attende la fine dei rolling update.
 
-La migrazione **V3** è *additiva*: prima del rilascio su un database esistente fai un backup con
-`pg_dump`. Backend e frontend vengono aggiornati insieme perché alcune API sono cambiate; Flyway
-applica le migrazioni all'avvio del backend. Verifica le aliquote IVA prima di usare dati reali.
+Le migrazioni **V3** e **V4** sono additive; V4 aggiunge il codice a barre facoltativo ai prodotti.
+Prima del rilascio su un database esistente fai un backup. Backend e frontend vengono aggiornati
+insieme perché alcune API sono cambiate; Flyway applica le migrazioni all'avvio del backend.
+Verifica le aliquote IVA prima di usare dati reali.
 
 ## Test locali
 

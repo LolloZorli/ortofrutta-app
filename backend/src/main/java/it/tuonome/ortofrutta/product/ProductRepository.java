@@ -13,4 +13,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     boolean existsByNameIgnoreCase(String name);
 
     boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
+
+    boolean existsByBarcodeIgnoreCase(String barcode);
+
+    boolean existsByBarcodeIgnoreCaseAndIdNot(String barcode, Long id);
 }

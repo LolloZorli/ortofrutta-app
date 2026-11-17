@@ -21,8 +21,13 @@ public final class ProductDtos {
             @DecimalMin("0") BigDecimal minStock,
             Long originId,
             @NotNull Long vatRateId,
-            Boolean active
+            Boolean active,
+            @Size(max = 32) String barcode
     ) {
+        public Request(String name, Long categoryId, Long unitId, BigDecimal salePrice,
+                       BigDecimal minStock, Long originId, Long vatRateId, Boolean active) {
+            this(name, categoryId, unitId, salePrice, minStock, originId, vatRateId, active, null);
+        }
     }
 
     /** "unit" è l'etichetta breve (kg, pz...); allowDecimals dice se si possono vendere quantità frazionarie. */
@@ -33,7 +38,7 @@ public final class ProductDtos {
             BigDecimal salePrice, BigDecimal minStock,
             Long originId, String origin,
             Long vatRateId, BigDecimal vatRate,
-            boolean active, BigDecimal stock, boolean lowStock
+            boolean active, BigDecimal stock, boolean lowStock, String barcode
     ) {
     }
 }

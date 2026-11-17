@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 @RestController
 @RequestMapping("/api/reports")
@@ -37,7 +42,7 @@ public class ReportController {
             return items;
         }
         return items.stream().map(i -> new ReportDtos.LowStockItem(i.productId(), i.productName(), i.unit(),
-                i.stock(), i.minStock(), i.suggestedQuantity(), null)).toList();
+                i.stock(), i.minStock(), i.suggestedQuantity(), null, i.averageDailySales(), i.daysOfStock())).toList();
     }
 
     @GetMapping("/products")
@@ -49,5 +54,17 @@ public class ReportController {
     public ReportDtos.Corrispettivi corrispettivi(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return service.corrispettivi(date != null ? date : LocalDate.now(ZoneId.of("Europe/Rome")));
+    }
+
+    @GetMapping("/cash-closing")
+    public ReportDtos.CashClosing cashClosing(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return service.cashClosing(date);
+    }
+
+    @PostMapping("/cash-closing")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ReportDtos.CashClosing saveCashClosing(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                                  @Valid @RequestBody ReportDtos.CashClosingRequest request) {
+        return service.saveCashClosing(date, request);
     }
 }
