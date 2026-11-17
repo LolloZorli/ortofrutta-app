@@ -28,7 +28,7 @@ public class ReportController {
         this.service = service;
     }
 
-    /** La dashboard è per tutti, ma gli importi dipendono dai permessi dell'utente. */
+    /** La visibilità della dashboard è riservata ai ruoli operativi; gli importi dipendono dai permessi dell'utente. */
     @GetMapping("/dashboard")
     public ReportDtos.Dashboard dashboard(Authentication auth) {
         return service.dashboard().restrict(

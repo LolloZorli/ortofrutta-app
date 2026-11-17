@@ -2,6 +2,7 @@ package it.tuonome.ortofrutta.config;
 
 import it.tuonome.ortofrutta.auth.UserJwtAuthenticationConverter;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -45,6 +46,7 @@ public class SecurityConfig {
                 .cors(cors -> { })
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/register",
                                 "/actuator/health", "/actuator/health/**",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
@@ -86,11 +88,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/customers/**").hasAuthority("CUSTOMERS_DELETE")
                         .requestMatchers("/api/customers/**")
                                 .hasAnyAuthority("CUSTOMERS_MANAGE", "RESERVATIONS_MANAGE")
+                        .requestMatchers(HttpMethod.GET, "/api/lookups").hasAuthority(UserJwtAuthenticationConverter.ACCESS)
                         .requestMatchers(HttpMethod.GET, "/api/customer-orders/mine").hasAuthority("CUSTOMER_ORDER_READ")
                         .requestMatchers(HttpMethod.POST, "/api/customer-orders/mine").hasAuthority("CUSTOMER_ORDER_CREATE")
                         .requestMatchers("/api/customer-orders/**").hasAuthority("RESERVATIONS_MANAGE")
 
-                        // report (la dashboard e le tipologiche in lettura sono per tutti gli utenti attivi)
+                        // report; la dashboard è disponibile agli operatori, non agli account cliente
                         .requestMatchers("/api/reports/products", "/api/reports/corrispettivi", "/api/reports/cash-closing")
                                 .hasAuthority("REPORTS_VIEW")
                         .requestMatchers(HttpMethod.GET, "/api/reports/dashboard")
@@ -98,7 +101,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/reports/reorder-suggestions")
                                 .hasAnyAuthority("SUPPLIER_ORDERS_MANAGE", "REPORTS_VIEW")
 
-                        .anyRequest().hasAuthority(UserJwtAuthenticationConverter.ACCESS))
+                        // Le nuove rotte non devono diventare accessibili automaticamente a tutti gli utenti attivi.
+                        .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter)));
         return http.build();
     }

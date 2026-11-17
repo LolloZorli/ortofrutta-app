@@ -156,10 +156,11 @@ Il namespace, PVC, Deployment e Service sono definiti in `k8s/app.yaml`. Le imma
 pubblicate su GHCR e poi impostate sui Deployment usando il tag immutabile del commit; il workflow
 attende la fine dei rolling update.
 
-Le migrazioni **V3–V6** aggiungono tipologiche e funzionalità senza cancellare i dati esistenti; V4 aggiunge
+Le migrazioni **V3–V7** aggiungono tipologiche e funzionalità senza cancellare i dati esistenti; V4 aggiunge
 il codice a barre, V5 aggiunge collegamento vendite-clienti, chiusura contanti e rettifiche inventario,
-V6 aggiunge account email collegati ai clienti. Prima di aggiornare un database già usato, fai un backup. Flyway applica le migrazioni
-all'avvio del backend. Verifica le aliquote IVA prima di usare dati reali.
+V6 aggiunge account email collegati ai clienti e V7 aggiorna la descrizione del ruolo Responsabile.
+Prima di aggiornare un database già usato, fai un backup. Flyway applica le migrazioni all'avvio del backend.
+Verifica le aliquote IVA prima di usare dati reali.
 
 Gli account dipendenti si creano da **Altro → Utenti** con password temporanea e ruolo; l'email è facoltativa
 per gli utenti esistenti e diventa un metodo di accesso aggiuntivo. Il portale clienti permette invece
@@ -195,7 +196,7 @@ Se Testcontainers segnala che l'API Docker `1.32` è troppo vecchia, imposta
 - `StockServiceTest`: logica FIFO, IVA congelata, quantità intere per le unità senza decimali (nessun database)
 - `LookupSlugTest`: generazione dei codici delle tipologiche
 - `ApiFlowTest`: carico, vendita, scarto, atomicità della vendita, paginazione
-- `RolesTest`: permessi dei 4 ruoli, ruoli personalizzati, permessi riservati, password temporanee, utenti disattivati
+- `RolesTest`: permessi dei ruoli operativi e Cliente, registrazione cliente, ruoli personalizzati, permessi riservati, password temporanee, utenti disattivati
 - `LookupsTest`: solo l'admin crea tipologiche, duplicati, valori disattivati, regole su unità e IVA
 - `SalesTest`: carrello, storno, corrispettivi per IVA (con vendite stornate escluse), ritiro prenotazioni, vendite visibili solo al proprio autore
 

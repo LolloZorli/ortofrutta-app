@@ -64,6 +64,39 @@ class RolesTest extends IntegrationTestBase {
     }
 
     @Test
+    void staffAndManagerCanCreateCustomersButWarehouseCannot() throws Exception {
+        String admin = admin();
+        String staff = readyUser(admin, "clientecommesso", "STAFF");
+        String manager = readyUser(admin, "clienteresponsabile", "MANAGER");
+        String warehouse = readyUser(admin, "clientemagazziniere", "WAREHOUSE");
+        String customer = "{\"name\":\"Cliente banco\",\"phone\":\"3331234567\",\"notes\":null}";
+
+        mvc.perform(post("/api/customers").header(AUTH, staff).contentType(JSON).content(customer))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("Cliente banco"));
+        mvc.perform(post("/api/customers").header(AUTH, manager).contentType(JSON).content(customer))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/customers").header(AUTH, warehouse).contentType(JSON).content(customer))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void customerSelfRegistrationDoesNotNeedStaffPermissions() throws Exception {
+        mvc.perform(post("/api/auth/register").contentType(JSON)
+                        .content("{\"name\":\"Cliente online\",\"email\":\"online@example.test\",\"phone\":null,\"password\":\"password123\"}"))
+                .andExpect(status().isCreated());
+
+        String customer = login("online@example.test", "password123");
+        mvc.perform(get("/api/customer-orders/mine").header(AUTH, customer)).andExpect(status().isOk());
+        mvc.perform(get("/api/lookups").header(AUTH, customer)).andExpect(status().isOk());
+        mvc.perform(get("/api/products").header(AUTH, customer)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/roles").header(AUTH, customer)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/customers").header(AUTH, customer).contentType(JSON)
+                        .content("{\"name\":\"Cliente extra\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void managerCanManageProductsAndReportsButNotUsersOrLookups() throws Exception {
         String admin = admin();
         String manager = readyUser(admin, "luisa", "MANAGER");
