@@ -65,9 +65,9 @@ public class SecurityConfig {
 
                         // amministrazione
                         .requestMatchers(HttpMethod.GET, "/api/users/role-options")
-                                .hasAnyAuthority("USERS_READ", "USERS_MANAGE")
+                                .hasAnyAuthority("USERS_READ", "USERS_APPROVE", "USERS_MANAGE")
                         .requestMatchers(HttpMethod.GET, "/api/users/**")
-                                .hasAnyAuthority("USERS_READ", "USERS_MANAGE")
+                                .hasAnyAuthority("USERS_READ", "USERS_APPROVE", "USERS_MANAGE")
                         .requestMatchers(HttpMethod.POST, "/api/users/*/approve")
                                 .hasAnyAuthority("USERS_APPROVE", "USERS_MANAGE")
                         .requestMatchers("/api/users/**").hasAuthority("USERS_MANAGE")

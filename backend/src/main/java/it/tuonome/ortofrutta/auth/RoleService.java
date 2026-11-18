@@ -28,6 +28,14 @@ public class RoleService {
     /** Chi carica merce o fa ordini deve poter scegliere il fornitore. */
     private static final Set<Permission> NEED_SUPPLIERS_READ = EnumSet.of(
             Permission.STOCK_RECEIVE, Permission.SUPPLIER_ORDER_CREATE, Permission.SUPPLIER_ORDERS_MANAGE);
+    private static final Set<Permission> NEED_STOCK_READ = EnumSet.of(
+            Permission.STOCK_RECEIVE, Permission.WASTE_CREATE);
+    private static final Set<Permission> NEED_CUSTOMERS_MANAGE = EnumSet.of(Permission.CUSTOMERS_DELETE);
+    private static final Set<Permission> NEED_USERS_READ = EnumSet.of(Permission.USERS_APPROVE);
+    private static final Set<Permission> NEED_CUSTOMER_ORDER_READ = EnumSet.of(Permission.CUSTOMER_ORDER_CREATE);
+    private static final Set<Permission> NEED_CATALOG_READ = EnumSet.of(
+            Permission.CUSTOMER_ORDER_READ, Permission.CUSTOMER_ORDER_CREATE);
+    private static final Set<Permission> NEED_SALES_CREATE = EnumSet.of(Permission.SALES_PRICE_OVERRIDE);
 
     private final RoleRepository roles;
     private final AuditService audit;
@@ -106,6 +114,24 @@ public class RoleService {
         }
         if (result.stream().anyMatch(NEED_SUPPLIERS_READ::contains)) {
             result.add(Permission.SUPPLIERS_READ);
+        }
+        if (result.stream().anyMatch(NEED_STOCK_READ::contains)) {
+            result.add(Permission.STOCK_READ);
+        }
+        if (result.stream().anyMatch(NEED_CUSTOMERS_MANAGE::contains)) {
+            result.add(Permission.CUSTOMERS_MANAGE);
+        }
+        if (result.stream().anyMatch(NEED_USERS_READ::contains)) {
+            result.add(Permission.USERS_READ);
+        }
+        if (result.stream().anyMatch(NEED_CUSTOMER_ORDER_READ::contains)) {
+            result.add(Permission.CUSTOMER_ORDER_READ);
+        }
+        if (result.stream().anyMatch(NEED_CATALOG_READ::contains)) {
+            result.add(Permission.CATALOG_READ);
+        }
+        if (result.stream().anyMatch(NEED_SALES_CREATE::contains)) {
+            result.add(Permission.SALES_CREATE);
         }
         return result;
     }

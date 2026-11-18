@@ -20,7 +20,7 @@ export interface UserAccount {
   mustChangePassword: boolean
 }
 
-export interface CatalogItem { id: number; name: string; category: string; unit: string; salePrice: number }
+export interface CatalogItem { id: number; name: string; category: string; unit: string; salePrice: number; availableQuantity: number }
 export interface CompanyShop { id: number; name: string; slug: string }
 
 export interface CustomerOrderLine { id: number; productId: number; productName: string; unit: string; quantity: number; unitPrice: number }

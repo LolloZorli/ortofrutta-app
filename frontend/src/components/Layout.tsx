@@ -43,7 +43,7 @@ export default function Layout() {
   const { pathname } = useLocation()
   const { canAny, profile, logout } = useAuth()
   const tabs = profile?.roleCode === 'CUSTOMER'
-    ? TABS.filter((t) => t.to === '/area-clienti')
+    ? TABS.filter((t) => t.to === '/altro' || (t.to === '/area-clienti' && canAny('CUSTOMER_ORDER_READ')))
     : TABS.filter((t) => !t.perm || canAny(...(Array.isArray(t.perm) ? t.perm : [t.perm])))
   return (
     <div className="app">

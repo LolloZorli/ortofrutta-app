@@ -23,13 +23,17 @@ export default function CustomerPortalPage() {
   const [notes, setNotes] = useState('')
   const [quantities, setQuantities] = useState<Record<number, string>>({})
   const [busy, setBusy] = useState(false)
-  const visible = useMemo(() => (catalog.data ?? []).filter((item) =>
+  const visible = useMemo(() => (catalog.data ?? []).filter((item) => item.availableQuantity > 0).filter((item) =>
     `${item.name} ${item.category}`.toLowerCase().includes(search.trim().toLowerCase())), [catalog.data, search])
 
   async function submitOrder() {
     const lines = Object.entries(quantities).filter(([, quantity]) => Number(quantity) > 0)
       .map(([productId, quantity]) => ({ productId: Number(productId), quantity: Number(quantity.replace(',', '.')) }))
     if (lines.length === 0) return toast.error('Aggiungi almeno un prodotto')
+    for (const line of lines) {
+      const item = catalog.data?.find((product) => product.id === line.productId)
+      if (!item || line.quantity > item.availableQuantity) return toast.error(`Disponibilità insufficiente per ${item?.name ?? 'un prodotto'}`)
+    }
     if (!pickupDate || pickupDate < todayIso()) return toast.error('Scegli una data valida')
     if (fulfillmentType === 'DELIVERY' && (!deliveryAddress.trim() || !deliveryCity.trim() || !deliveryPostalCode.trim() || !deliveryPhone.trim())) {
       return toast.error('Per la consegna indica indirizzo, città, CAP e telefono')
@@ -59,10 +63,11 @@ export default function CustomerPortalPage() {
       <p className="muted">Scegli i prodotti e invia l’ordine al negozio selezionato.</p>
     </div>
     <input placeholder="Cerca nel catalogo…" value={search} onChange={(event) => setSearch(event.target.value)} />
-    {visible.length === 0 ? <Empty>Nessun prodotto trovato.</Empty> : <div className="product-grid">
+    {visible.length === 0 ? <Empty>{search.trim() ? 'Nessun prodotto disponibile corrisponde alla ricerca.' : 'Al momento non ci sono prodotti disponibili in magazzino.'}</Empty> : <div className="product-grid">
       {visible.map((item) => <div className="card stack" key={item.id}>
-        <div><div className="item-title">{item.name}</div><div className="item-sub">{item.category} · {eur(item.salePrice)}/{item.unit}</div></div>
-        <label className="field"><span>Quantità ({item.unit})</span><input inputMode="decimal" min="0" step="any" value={quantities[item.id] ?? ''}
+        <div><div className="item-title">{item.name}</div><div className="item-sub">{item.category} · {eur(item.salePrice)}/{item.unit}</div>
+          <div className="item-sub">Disponibili: {qty(item.availableQuantity, item.unit)}</div></div>
+        <label className="field"><span>Quantità ({item.unit})</span><input inputMode="decimal" min="0" max={item.availableQuantity} step="any" value={quantities[item.id] ?? ''}
           onChange={(event) => setQuantities((current) => ({ ...current, [item.id]: event.target.value }))} /></label>
       </div>)}
     </div>}

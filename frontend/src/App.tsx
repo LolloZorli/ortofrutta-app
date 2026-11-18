@@ -29,11 +29,12 @@ const CustomerPortalPage = lazy(() => import('./pages/CustomerPortalPage'))
 function Guard({ perm, children }: { perm: string | string[]; children: ReactElement }) {
   const { canAny } = useAuth()
   const perms = Array.isArray(perm) ? perm : [perm]
-  return canAny(...perms) ? children : <Navigate to="/" replace />
+  // /altro è la destinazione sicura: per un cliente / reindirizza già all'area ordini.
+  return canAny(...perms) ? children : <Navigate to="/altro" replace />
 }
 
 export default function App() {
-  const { profile, ready } = useAuth()
+  const { profile, ready, canAny } = useAuth()
 
   if (!ready) return <Loading />
   if (!profile) return <LoginPage />
@@ -44,7 +45,10 @@ export default function App() {
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route element={<Layout />}>
-            <Route index element={profile.roleCode === 'CUSTOMER' ? <Navigate to="/area-clienti" replace /> : <DashboardPage />} />
+            <Route index element={profile.roleCode === 'CUSTOMER'
+              ? <Navigate to={canAny('CUSTOMER_ORDER_READ') ? '/area-clienti' : '/altro'} replace />
+              : canAny('STOCK_READ', 'SALES_CREATE', 'REPORTS_VIEW', 'SUPPLIER_ORDERS_MANAGE')
+                ? <DashboardPage /> : <Navigate to="/altro" replace />} />
             <Route path="area-clienti" element={<Guard perm="CUSTOMER_ORDER_READ"><CustomerPortalPage /></Guard>} />
             <Route path="altro" element={<MorePage />} />
 
@@ -64,7 +68,7 @@ export default function App() {
             <Route path="report" element={<Guard perm="REPORTS_VIEW"><ReportPage /></Guard>} />
             <Route path="corrispettivi" element={<Guard perm="REPORTS_VIEW"><CorrispettiviPage /></Guard>} />
             <Route path="registro" element={<Guard perm="AUDIT_VIEW"><AuditPage /></Guard>} />
-            <Route path="utenti" element={<Guard perm={['USERS_READ', 'USERS_MANAGE']}><UsersPage /></Guard>} />
+            <Route path="utenti" element={<Guard perm={['USERS_READ', 'USERS_APPROVE', 'USERS_MANAGE']}><UsersPage /></Guard>} />
             <Route path="ruoli" element={<Guard perm="ROLES_MANAGE"><RolesPage /></Guard>} />
             <Route path="tipologiche" element={<Guard perm="LOOKUPS_MANAGE"><LookupsPage /></Guard>} />
 

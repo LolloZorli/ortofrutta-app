@@ -15,6 +15,7 @@ import it.tuonome.ortofrutta.lookup.LookupType;
 import it.tuonome.ortofrutta.sale.SaleItem;
 import it.tuonome.ortofrutta.sale.SaleService;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,10 +41,11 @@ public class CustomerOrderService {
     private final LookupService lookups;
     private final UserRepository users;
     private final CompanyMembershipRepository memberships;
+    private final JdbcClient jdbc;
 
     public CustomerOrderService(CustomerOrderRepository orders, CustomerRepository customers,
                                 ProductRepository products, SaleService sales, LookupService lookups, UserRepository users,
-                                CompanyMembershipRepository memberships) {
+                                CompanyMembershipRepository memberships, JdbcClient jdbc) {
         this.orders = orders;
         this.customers = customers;
         this.products = products;
@@ -51,6 +53,7 @@ public class CustomerOrderService {
         this.lookups = lookups;
         this.users = users;
         this.memberships = memberships;
+        this.jdbc = jdbc;
     }
 
     /** Aperte: tutte. Storico: le ultime 100. */
@@ -79,10 +82,29 @@ public class CustomerOrderService {
         CustomerOrder order = new CustomerOrder(customer, request.pickupDate(), request.notes(),
                 request.fulfillmentType(), request.deliveryAddress(), request.deliveryCity(),
                 request.deliveryPostalCode(), request.deliveryPhone(), request.deliveryNotes());
+        var requested = request.lines().stream().collect(java.util.stream.Collectors.groupingBy(
+                CustomerOrderDtos.CustomerLineRequest::productId,
+                java.util.TreeMap::new,
+                java.util.stream.Collectors.reducing(java.math.BigDecimal.ZERO, CustomerOrderDtos.CustomerLineRequest::quantity, java.math.BigDecimal::add)));
+        // Serialize reservations per product, then check physical stock less all open reservations.
+        for (Long productId : requested.keySet()) {
+            Product product = products.findByIdForUpdate(productId)
+                    .orElseThrow(() -> new NotFoundException("Prodotto", productId));
+            if (!product.isActive()) throw new BusinessException("Il prodotto \"" + product.getName() + "\" non è disponibile");
+            BigDecimal available = jdbc.sql("""
+                    select greatest(coalesce((select sum(l.remaining_quantity) from lots l where l.product_id = :productId and l.company_id = :companyId and l.remaining_quantity > 0), 0)
+                      - coalesce((select sum(col.quantity) from customer_order_lines col join customer_orders co
+                                  on co.id = col.order_id and co.company_id = col.company_id
+                                  where col.product_id = :productId and col.company_id = :companyId and co.status in ('NEW', 'READY')), 0), 0)
+                    """).param("productId", productId).param("companyId", CompanyContext.requireId())
+                    .query(BigDecimal.class).single();
+            if (available.compareTo(requested.get(productId)) < 0) {
+                throw new BusinessException("Disponibilità insufficiente per \"" + product.getName() + "\": disponibili " + available);
+            }
+        }
         for (CustomerOrderDtos.CustomerLineRequest line : request.lines()) {
             Product product = products.findById(line.productId())
                     .orElseThrow(() -> new NotFoundException("Prodotto", line.productId()));
-            if (!product.isActive()) throw new BusinessException("Il prodotto \"" + product.getName() + "\" non è disponibile");
             var unit = lookups.find(LookupType.UNIT, product.getUnitId());
             if (unit != null && Boolean.FALSE.equals(unit.allowDecimals())
                     && line.quantity().stripTrailingZeros().scale() > 0) {

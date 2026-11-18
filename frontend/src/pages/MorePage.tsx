@@ -21,7 +21,7 @@ const ITEMS: Item[] = [
   { to: '/report', label: '📊 Report: vendite, margini, scarti', perms: ['REPORTS_VIEW'] },
   { to: '/registro', label: '📜 Registro attività', perms: ['AUDIT_VIEW'] },
   { to: '/tipologiche', label: '🗂️ Tipologiche (categorie, unità, IVA...)', perms: ['LOOKUPS_MANAGE'] },
-  { to: '/utenti', label: '👥 Commessi e richieste di accesso', perms: ['USERS_READ', 'USERS_MANAGE'] },
+  { to: '/utenti', label: '👥 Commessi e richieste di accesso', perms: ['USERS_READ', 'USERS_APPROVE', 'USERS_MANAGE'] },
   { to: '/ruoli', label: '🛡️ Ruoli e permessi', perms: ['ROLES_MANAGE'] },
 ]
 
