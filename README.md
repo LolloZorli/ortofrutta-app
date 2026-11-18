@@ -117,8 +117,20 @@ Con il profilo `demo` esistono anche `commesso` / `commesso123`, `responsabile` 
 ### 2. Tutto in container
 
 ```bash
-docker compose --profile app up --build        # app su http://localhost:3000, API su :8081
+docker compose --profile app pull              # scarica le immagini pubblicate su GHCR
+docker compose --profile app up -d             # app su http://localhost:3000, API su :8081
 ```
+
+PostgreSQL è raggiungibile dal PC su `localhost:5433`; i container si collegano invece al servizio
+`db:5432` sulla rete Docker. La porta host `5433` non va usata nell'URL JDBC del backend.
+Le richieste del frontend passano da nginx (`/api`) e restano sullo stesso origin: nginx non inoltra
+l'header `Origin` al backend. `APP_CORS_ALLOWED_ORIGINS` in Compose autorizza comunque `http://localhost:3000`
+se si interroga direttamente l'API dalla porta `8081`.
+
+Per aggiornare l'app dopo una pubblicazione GitHub Actions, esegui `docker compose --profile app pull`
+e poi `docker compose --profile app up -d`. Se GHCR segnala `denied`, autentica Docker con un token GitHub
+che abbia `read:packages`, oppure rendi pubblici i package. Per provare modifiche ai sorgenti locali,
+usa una configurazione Compose di sviluppo con `build` per backend e frontend.
 
 ### Installare l'app sul telefono
 
@@ -132,9 +144,11 @@ L'interfaccia può aprirsi dalla cache, ma accesso, vendite e dati richiedono il
 ## CI/CD e deploy su Kubernetes
 
 Ogni push su `master` esegue i test backend (`mvn verify`) e la build frontend. Se entrambi passano,
-GitHub Actions pubblica su GHCR le immagini `backend` e `frontend`, ciascuna con tag del commit e `latest`.
-Il deploy Kubernetes è facoltativo e parte dopo la pubblicazione quando la variabile repository
-`DEPLOY_KUBERNETES` è impostata a `true`. Le pull request eseguono solo la CI.
+il job `publish` costruisce e pubblica su GHCR le immagini `backend` e `frontend`, ciascuna con tag del commit
+(immutabile) e `latest`. Questo pubblica le immagini su GHCR, ma non modifica i container sul PC: per
+aggiornarli manualmente esegui `docker compose --profile app pull` e poi `docker compose --profile app up -d`.
+Le pull request eseguono solo la CI. Il job `deploy`, distinto da `publish`, aggiorna Kubernetes solo se la
+variabile repository `DEPLOY_KUBERNETES` è impostata a `true`.
 
 Prima del primo push configura:
 
@@ -209,7 +223,7 @@ I test di integrazione condividono **un solo PostgreSQL** (Testcontainers) e un 
 | `JWT_SECRET` | Chiave di firma dei token, min. 32 caratteri | valore fisso di sviluppo |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Amministratore creato al primo avvio | `admin` / `admin123` |
 | `ADMIN_MUST_CHANGE_PASSWORD` | Obbliga a cambiare la password al primo accesso | `true` |
-| `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` | Database | `localhost:5432/ortofrutta` |
+| `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` | Database | `localhost:5433/ortofrutta` dal PC; `db:5432/ortofrutta` nei container |
 | `SPRING_PROFILES_ACTIVE=demo` | Carica dati di prova | disattivo |
 
 ## Limiti noti

@@ -18,9 +18,8 @@ services:
 
   backend:
     profiles: [app]
-    build:
-      context: ./backend
-    image: ghcr.io/lollozorli/ortofrutta-app-backend:latest
+    image: ghcr.io/lollozorli/ortofrutta-app-backend:${APP_IMAGE_TAG:-latest}
+    pull_policy: always
     container_name: ortofrutta-backend
     ports:
       - "8081:8080"
@@ -29,6 +28,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ortofrutta
       SPRING_DATASOURCE_PASSWORD: ortofrutta
       SPRING_PROFILES_ACTIVE: demo
+      APP_CORS_ALLOWED_ORIGINS: http://localhost:3000
       JWT_SECRET: ${JWT_SECRET:-change-me-please-use-a-long-random-secret-0123456789}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
     depends_on:
@@ -37,9 +37,8 @@ services:
 
   frontend:
     profiles: [app]
-    build:
-      context: ./frontend
-    image: ghcr.io/lollozorli/ortofrutta-app-frontend:latest
+    image: ghcr.io/lollozorli/ortofrutta-app-frontend:${APP_IMAGE_TAG:-latest}
+    pull_policy: always
     container_name: ortofrutta-frontend
     ports:
       - "3000:8080"
