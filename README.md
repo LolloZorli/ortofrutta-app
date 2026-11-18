@@ -52,9 +52,9 @@ I permessi sono un elenco fisso nel codice (ogni permesso = una funzione); i **r
 
 | Ruolo (pronto all'uso) | Cosa fa |
 |---|---|
-| **Amministratore** | Tutto, sempre. È l'unico con utenti, ruoli e tipologiche. Non modificabile |
-| **Responsabile** | Gestisce il negozio: prodotti e prezzi, cassa, storni, carico, ordini, costi, report, registro. Non gestisce utenti/ruoli/tipologiche |
-| **Cassiere** | Vende (a prezzo di listino), registra scarti, clienti e prenotazioni. Non vede costi e margini |
+| **Amministratore** | Tutto, sempre. Ha la gestione completa di utenti, ruoli e tipologiche. Non modificabile |
+| **Responsabile** | Gestisce il negozio: prodotti e prezzi, cassa, storni, carico, ordini, costi, report, registro; consulta commessi e clienti e approva le richieste staff. Non gestisce ruoli/tipologiche |
+| **Cassiere** | Vende (a prezzo di listino), consulta i fornitori e crea ordini ai fornitori; registra scarti, clienti e prenotazioni. Non vede costi e margini |
 | **Magazziniere** | Riceve la merce e gestisce gli ordini. Non usa la cassa |
 | **Cliente** | Si registra con email e password, consulta il catalogo e crea/consulta solo i propri ordini |
 
@@ -80,6 +80,11 @@ L'identità di accesso del cliente è condivisa: per aggiungere un altro negozio
 quel negozio, scegli la registrazione cliente e inserisci la stessa email e password. Verrà creato un profilo
 cliente distinto per l'azienda; ordini e dati personali di negozi diversi restano separati. I dati già presenti
 nel database vengono migrati nell'azienda `ortofrutta` senza cancellarli.
+
+La schermata iniziale offre quattro ingressi: accedi, registrazione cliente, richiesta di accesso come commesso e
+registrazione azienda. Il commesso seleziona il negozio e crea l'account; il responsabile approva la richiesta da
+**Altro → Commessi e richieste di accesso** prima che l'account possa entrare nel gestionale. Il cliente sceglie
+un negozio dall'elenco e può cambiare negozio dal pulsante in alto; il logout è disponibile per tutti i ruoli.
 
 Nel portale ordini il cliente sceglie tra ritiro e consegna a domicilio. Per la consegna inserisce indirizzo,
 città, CAP e telefono; il negozio vede i dettagli, prepara l'ordine e registra la consegna con il metodo di
@@ -232,6 +237,7 @@ Se Testcontainers segnala che l'API Docker `1.32` è troppo vecchia, imposta
 - `SalesTest`: carrello, storno, corrispettivi per IVA (con vendite stornate escluse), ritiro prenotazioni, vendite visibili solo al proprio autore
 - `CustomerPortalTest`: catalogo senza costi o giacenze, ordine al prezzo di listino, consegna a domicilio, completamento con vendita e visibilità limitata ai propri ordini
 - `CompanyIsolationTest`: registrazione aziende, utenti e ruoli separati, cataloghi e ordini isolati, account cliente condiviso fra negozi
+- `EmployeeRegistrationTest`: richiesta commesso, accesso bloccato prima dell'approvazione e attivazione da parte del responsabile
 
 I test di integrazione condividono **un solo PostgreSQL** (Testcontainers) e un solo contesto Spring.
 

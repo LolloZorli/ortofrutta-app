@@ -7,14 +7,14 @@ interface Tab {
   icon: string
   end?: boolean
   /** Il tab compare solo a chi ha questo permesso. */
-  perm?: string
+  perm?: string | string[]
 }
 
 const TABS: Tab[] = [
   { to: '/', label: 'Home', icon: '🏠', end: true },
   { to: '/cassa', label: 'Cassa', icon: '💶', perm: 'SALES_CREATE' },
   { to: '/magazzino', label: 'Magazzino', icon: '📦', perm: 'STOCK_READ' },
-  { to: '/ordini', label: 'Ordini', icon: '🚚', perm: 'SUPPLIER_ORDERS_MANAGE' },
+  { to: '/ordini', label: 'Ordini', icon: '🚚', perm: ['SUPPLIER_ORDER_CREATE', 'SUPPLIER_ORDERS_MANAGE'] },
   { to: '/prenotazioni', label: 'Prenota', icon: '🛍️', perm: 'RESERVATIONS_MANAGE' },
   { to: '/area-clienti', label: 'I miei ordini', icon: '🧺', perm: 'CUSTOMER_ORDER_READ' },
   { to: '/altro', label: 'Altro', icon: '⋯' },
@@ -41,10 +41,10 @@ const TITLES: Record<string, string> = {
 
 export default function Layout() {
   const { pathname } = useLocation()
-  const { can, profile, logout } = useAuth()
+  const { canAny, profile, logout } = useAuth()
   const tabs = profile?.roleCode === 'CUSTOMER'
     ? TABS.filter((t) => t.to === '/area-clienti')
-    : TABS.filter((t) => !t.perm || can(t.perm))
+    : TABS.filter((t) => !t.perm || canAny(...(Array.isArray(t.perm) ? t.perm : [t.perm])))
   return (
     <div className="app">
       <header className="topbar">
@@ -59,7 +59,9 @@ export default function Layout() {
               <strong>{profile.username}</strong>
               <small>{profile.roleName}</small>
             </span>
-            {profile.roleCode === 'CUSTOMER' && <button className="btn btn-sm" onClick={logout}>Esci</button>}
+            <button className="btn btn-sm" onClick={logout} aria-label={profile.roleCode === 'CUSTOMER' ? 'Cambia negozio' : 'Esci dall’account'}>
+              {profile.roleCode === 'CUSTOMER' ? 'Cambia negozio' : 'Esci'}
+            </button>
           </div>
         )}
       </header>

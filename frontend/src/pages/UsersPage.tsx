@@ -10,7 +10,8 @@ import type { RoleOption, UserAccount } from '../types'
 type Editing = { kind: 'new' } | { kind: 'edit'; user: UserAccount } | { kind: 'reset'; user: UserAccount }
 
 export default function UsersPage() {
-  const { profile } = useAuth()
+  const { profile, can, canAny } = useAuth()
+  const toast = useToast()
   const [editing, setEditing] = useState<Editing | null>(null)
   const { data, loading, error, reload } = useLoad<UserAccount[]>(() => api.get('/users'))
   const roles = useLoad<RoleOption[]>(() => api.get('/users/role-options'))
@@ -24,15 +25,23 @@ export default function UsersPage() {
     reload()
   }
   const roleOptions = roles.data ?? []
+  const canManage = can('USERS_MANAGE')
+  const canApprove = canAny('USERS_APPROVE', 'USERS_MANAGE')
+
+  async function approve(user: UserAccount) {
+    try {
+      await api.post(`/users/${user.id}/approve`)
+      toast.ok(`${user.username} è stato attivato`)
+      reload()
+    } catch (err) { toast.error(errorMessage(err)) }
+  }
 
   return (
     <div className="stack">
       <p className="muted">
-        Ogni utente ha un ruolo, e il ruolo decide cosa può fare. I ruoli si gestiscono in <strong>Ruoli e permessi</strong>.
+        Qui trovi commessi e richieste di accesso. I clienti e i loro recapiti sono nella sezione <strong>Clienti</strong>.
       </p>
-      <button className="btn btn-primary" onClick={() => setEditing({ kind: 'new' })}>
-        + Nuovo utente
-      </button>
+      {canManage && <button className="btn btn-primary" onClick={() => setEditing({ kind: 'new' })}>+ Nuovo utente</button>}
 
       <div className="list">
         {data.map((u) => {
@@ -48,19 +57,21 @@ export default function UsersPage() {
                   {u.email && <div className="item-sub">{u.email}</div>}
                 </div>
                 <div className="row">
+                  {!u.approved && <Chip tone="orange">in attesa</Chip>}
+                  {u.approved && <Chip tone={u.enabled ? 'green' : 'gray'}>{u.enabled ? 'attivo' : 'disattivato'}</Chip>}
                   {u.mustChangePassword && <Chip tone="orange">password temporanea</Chip>}
-                  <Chip tone={u.enabled ? 'green' : 'gray'}>{u.enabled ? 'attivo' : 'disattivato'}</Chip>
                 </div>
               </div>
               <div className="row wrap" style={{ marginTop: 10 }}>
-                {!isMe && (
+                {!u.approved && canApprove && <button className="btn btn-primary btn-sm" onClick={() => void approve(u)}>Approva accesso</button>}
+                {canManage && !isMe && (
                   <button className="btn btn-sm" onClick={() => setEditing({ kind: 'edit', user: u })}>
                     Ruolo e stato
                   </button>
                 )}
-                <button className="btn btn-sm" onClick={() => setEditing({ kind: 'reset', user: u })}>
+                {canManage && <button className="btn btn-sm" onClick={() => setEditing({ kind: 'reset', user: u })}>
                   Reimposta password
-                </button>
+                </button>}
               </div>
             </div>
           )

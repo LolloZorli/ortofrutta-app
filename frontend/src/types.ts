@@ -16,6 +16,7 @@ export interface UserAccount {
   roleId: number
   roleName: string
   enabled: boolean
+  approved: boolean
   mustChangePassword: boolean
 }
 

@@ -6,6 +6,7 @@ import { Chip, Empty, ErrorBox, Field, Loading } from '../components/ui'
 import { dateTimeIt, eur, parseDecimal, qty } from '../format'
 import { useLoad, usePaged } from '../hooks'
 import { useToast } from '../toast'
+import { useAuth } from '../auth'
 import type { LowStockItem, PageResponse, Product, Supplier, SupplierOrder, SupplierOrderStatus } from '../types'
 
 const STATUS: Record<SupplierOrderStatus, { label: string; tone: 'gray' | 'blue' | 'green' | 'red' }> = {
@@ -29,6 +30,9 @@ function whatsappLink(phone: string | null, text: string): string {
 }
 
 export default function SupplierOrdersPage() {
+  const { can } = useAuth()
+  const canManage = can('SUPPLIER_ORDERS_MANAGE')
+  const canSeeCosts = can('COSTS_VIEW')
   const [creating, setCreating] = useState(false)
   const [receiving, setReceiving] = useState<SupplierOrder | null>(null)
   const { items, loading, loadingMore, error, hasMore, loadMore, reload } = usePaged<SupplierOrder>(
@@ -48,7 +52,7 @@ export default function SupplierOrdersPage() {
       ) : (
         <div className="list">
           {items.map((o) => (
-            <OrderCard key={o.id} order={o} onChanged={reload} onReceive={() => setReceiving(o)} />
+            <OrderCard key={o.id} order={o} canManage={canManage} onChanged={reload} onReceive={() => setReceiving(o)} />
           ))}
           {hasMore && (
             <button className="btn" disabled={loadingMore} onClick={() => void loadMore()}>
@@ -59,6 +63,7 @@ export default function SupplierOrdersPage() {
       )}
       {creating && (
         <NewOrderModal
+          canSeeCosts={canSeeCosts}
           onClose={() => setCreating(false)}
           onCreated={() => {
             setCreating(false)
@@ -80,7 +85,7 @@ export default function SupplierOrdersPage() {
   )
 }
 
-function OrderCard({ order: o, onChanged, onReceive }: { order: SupplierOrder; onChanged: () => void; onReceive: () => void }) {
+function OrderCard({ order: o, canManage, onChanged, onReceive }: { order: SupplierOrder; canManage: boolean; onChanged: () => void; onReceive: () => void }) {
   const toast = useToast()
   const [busy, setBusy] = useState(false)
   const st = STATUS[o.status]
@@ -127,8 +132,10 @@ function OrderCard({ order: o, onChanged, onReceive }: { order: SupplierOrder; o
           <strong>{eur(o.total)}</strong>
         </div>
       )}
+      {!canManage && (o.status === 'DRAFT' || o.status === 'SENT') &&
+        <div className="notice">Ordine in attesa che un responsabile lo invii o registri la merce ricevuta.</div>}
       <div className="row wrap" style={{ marginTop: 10 }}>
-        {o.status === 'DRAFT' && (
+        {canManage && o.status === 'DRAFT' && (
           <>
             <button className="btn btn-primary btn-sm" disabled={busy} onClick={sendWhatsapp}>
               Invia su WhatsApp
@@ -142,12 +149,12 @@ function OrderCard({ order: o, onChanged, onReceive }: { order: SupplierOrder; o
             </button>
           </>
         )}
-        {(o.status === 'DRAFT' || o.status === 'SENT') && (
+        {canManage && (o.status === 'DRAFT' || o.status === 'SENT') && (
           <button className="btn btn-sm" disabled={busy} onClick={onReceive}>
             Merce arrivata
           </button>
         )}
-        {o.status === 'SENT' && (
+        {canManage && o.status === 'SENT' && (
           <button
             className="btn btn-sm btn-danger"
             disabled={busy}
@@ -156,7 +163,7 @@ function OrderCard({ order: o, onChanged, onReceive }: { order: SupplierOrder; o
             Annulla
           </button>
         )}
-        {(o.status === 'DRAFT' || o.status === 'CANCELLED') && (
+        {canManage && (o.status === 'DRAFT' || o.status === 'CANCELLED') && (
           <button
             className="btn btn-sm btn-danger"
             disabled={busy}
@@ -176,7 +183,7 @@ interface DraftLine {
   unitCost: string
 }
 
-function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function NewOrderModal({ canSeeCosts, onClose, onCreated }: { canSeeCosts: boolean; onClose: () => void; onCreated: () => void }) {
   const toast = useToast()
   const suppliers = useLoad<Supplier[]>(() => api.get('/suppliers'))
   const products = useLoad<Product[]>(() => api.get('/products'))
@@ -253,7 +260,7 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
 
         <div className="stack">
           {lines.map((l, i) => (
-            <div key={i} className="line-row with-cost">
+            <div key={i} className={`line-row${canSeeCosts ? ' with-cost' : ''}`}>
               <ProductSelect products={productList} value={l.productId} onChange={(v) => setLine(i, { productId: v })} />
               <input
                 placeholder="Qtà"
@@ -261,12 +268,12 @@ function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated:
                 value={l.quantity}
                 onChange={(e) => setLine(i, { quantity: e.target.value })}
               />
-              <input
-                placeholder="€ costo"
-                inputMode="decimal"
-                value={l.unitCost}
-                onChange={(e) => setLine(i, { unitCost: e.target.value })}
-              />
+              {canSeeCosts && <input
+                  placeholder="€ costo"
+                  inputMode="decimal"
+                  value={l.unitCost}
+                  onChange={(e) => setLine(i, { unitCost: e.target.value })}
+                />}
               <button
                 type="button"
                 className="icon-btn"

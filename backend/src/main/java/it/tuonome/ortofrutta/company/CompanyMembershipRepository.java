@@ -10,7 +10,7 @@ import java.util.Optional;
 public interface CompanyMembershipRepository extends JpaRepository<CompanyMembership, Long> {
 
     @Query("select m from CompanyMembership m join fetch m.user join fetch m.role "
-            + "where m.companyId = :companyId and lower(m.user.username) = lower(:username) and m.enabled = true")
+            + "where m.companyId = :companyId and lower(m.user.username) = lower(:username) and m.enabled = true and m.approved = true")
     Optional<CompanyMembership> findActiveByCompanyAndUsername(@Param("companyId") Long companyId,
                                                                 @Param("username") String username);
 
@@ -19,7 +19,7 @@ public interface CompanyMembershipRepository extends JpaRepository<CompanyMember
     List<CompanyMembership> findAllByCompanyId(@Param("companyId") Long companyId);
 
     @Query("select m from CompanyMembership m join fetch m.role "
-            + "where m.companyId = :companyId and m.user.id = :userId and m.enabled = true")
+            + "where m.companyId = :companyId and m.user.id = :userId and m.enabled = true and m.approved = true")
     Optional<CompanyMembership> findActiveByCompanyAndUserId(@Param("companyId") Long companyId,
                                                              @Param("userId") Long userId);
 

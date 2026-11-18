@@ -23,10 +23,11 @@ public class RoleService {
     /** Chi fa queste cose ha bisogno di leggere il listino. */
     private static final Set<Permission> NEED_PRODUCTS_READ = EnumSet.of(
             Permission.SALES_CREATE, Permission.STOCK_READ, Permission.STOCK_RECEIVE, Permission.WASTE_CREATE,
-            Permission.SUPPLIER_ORDERS_MANAGE, Permission.RESERVATIONS_MANAGE, Permission.PRODUCTS_WRITE);
+            Permission.SUPPLIER_ORDER_CREATE, Permission.SUPPLIER_ORDERS_MANAGE,
+            Permission.RESERVATIONS_MANAGE, Permission.PRODUCTS_WRITE);
     /** Chi carica merce o fa ordini deve poter scegliere il fornitore. */
     private static final Set<Permission> NEED_SUPPLIERS_READ = EnumSet.of(
-            Permission.STOCK_RECEIVE, Permission.SUPPLIER_ORDERS_MANAGE);
+            Permission.STOCK_RECEIVE, Permission.SUPPLIER_ORDER_CREATE, Permission.SUPPLIER_ORDERS_MANAGE);
 
     private final RoleRepository roles;
     private final AuditService audit;

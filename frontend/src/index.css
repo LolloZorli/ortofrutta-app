@@ -484,6 +484,44 @@ textarea:focus {
   border-radius: 18px;
   margin: 0 auto;
 }
+.auth-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 4px 0 8px;
+}
+.auth-mode {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.auth-mode.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+.notice {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 0.9rem;
+}
+.notice.success {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
 
 /* ---------- varie ---------- */
 .price-line {

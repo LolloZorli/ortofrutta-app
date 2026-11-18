@@ -25,6 +25,7 @@ public enum Permission {
 
     SUPPLIERS_READ("Consultare i fornitori", "Fornitori e ordini", false),
     SUPPLIERS_MANAGE("Gestire i fornitori", "Fornitori e ordini", false),
+    SUPPLIER_ORDER_CREATE("Creare ordini ai fornitori", "Fornitori e ordini", false),
     SUPPLIER_ORDERS_MANAGE("Gestire gli ordini ai fornitori", "Fornitori e ordini", false),
 
     CUSTOMERS_MANAGE("Gestire i clienti", "Clienti", false),
@@ -33,6 +34,8 @@ public enum Permission {
 
     AUDIT_VIEW("Consultare il registro delle attività", "Amministrazione", false),
     USERS_MANAGE("Gestire gli utenti", "Amministrazione", true),
+    USERS_READ("Vedere commessi e richieste di accesso", "Amministrazione", false),
+    USERS_APPROVE("Approvare le richieste dei commessi", "Amministrazione", false),
     ROLES_MANAGE("Gestire ruoli e permessi", "Amministrazione", true),
     LOOKUPS_MANAGE("Gestire le tipologiche (categorie, unità, IVA...)", "Amministrazione", true);
 

@@ -50,8 +50,12 @@ public class AuthService {
                 .filter(AppUser::isEnabled)
                 .filter(u -> encoder.matches(request.password(), u.getPasswordHash()))
                 .orElseThrow(() -> new BadCredentialsException("Credenziali non valide"));
-        CompanyMembership membership = memberships.findActiveByCompanyAndUserId(CompanyContext.requireId(), user.getId())
+        CompanyMembership membership = memberships.findByCompanyAndUserId(CompanyContext.requireId(), user.getId())
                 .orElseThrow(() -> new BadCredentialsException("Account non associato a questa azienda"));
+        if (!membership.isApproved()) {
+            throw new BadCredentialsException("La richiesta di accesso è in attesa di approvazione da parte dell'azienda");
+        }
+        if (!membership.isEnabled()) throw new BadCredentialsException("Account disattivato in questa azienda");
 
         Instant now = Instant.now();
         Instant expiresAt = now.plus(props.jwt().expiration());
@@ -89,6 +93,21 @@ public class AuthService {
         Customer customer = customers.save(new Customer(request.name(), request.phone(), null, null));
         memberships.save(new CompanyMembership(CompanyContext.requireId(), user, customerRole, customer.getId()));
         if (user.getCustomerId() == null) user.setCustomerId(customer.getId());
+    }
+
+    @Transactional
+    public AuthDtos.EmployeeRegistrationResponse registerEmployee(AuthDtos.EmployeeRegistrationRequest request) {
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        if (users.findByEmailIgnoreCase(email).isPresent() || users.findByUsernameIgnoreCase(email).isPresent()) {
+            throw new BusinessException("Esiste già un account con questa email: accedi o usa un altro indirizzo");
+        }
+        AppRole staffRole = roles.findByCode("STAFF")
+                .orElseThrow(() -> new IllegalStateException("Ruolo Commesso mancante per questa azienda"));
+        AppUser user = users.save(new AppUser(email, email, null, encoder.encode(request.password()), staffRole, false));
+        user.setDisplayName(request.name());
+        memberships.save(new CompanyMembership(CompanyContext.requireId(), user, staffRole, null, false, false));
+        return new AuthDtos.EmployeeRegistrationResponse(
+                "Richiesta inviata. Potrai accedere dopo l'approvazione dell'azienda.", "PENDING");
     }
 
     @Transactional(readOnly = true)

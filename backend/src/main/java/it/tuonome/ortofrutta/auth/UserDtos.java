@@ -32,11 +32,12 @@ public final class UserDtos {
     }
 
     public record Response(Long id, String username, String email, Long roleId, String roleName,
-                           boolean enabled, boolean mustChangePassword) {
+                           boolean enabled, boolean approved, boolean mustChangePassword) {
         static Response from(CompanyMembership membership) {
             AppUser u = membership.getUser();
             return new Response(u.getId(), u.getUsername(), u.getEmail(), membership.getRole().getId(),
-                    membership.getRole().getName(), membership.isEnabled() && u.isEnabled(), u.isMustChangePassword());
+                    membership.getRole().getName(), membership.isEnabled() && u.isEnabled(), membership.isApproved(),
+                    u.isMustChangePassword());
         }
     }
 }

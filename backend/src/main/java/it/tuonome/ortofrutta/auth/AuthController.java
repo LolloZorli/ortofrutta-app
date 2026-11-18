@@ -27,6 +27,13 @@ public class AuthController {
         service.registerCustomer(request);
     }
 
+    @PostMapping("/register-employee")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public AuthDtos.EmployeeRegistrationResponse registerEmployee(
+            @Valid @RequestBody AuthDtos.EmployeeRegistrationRequest request) {
+        return service.registerEmployee(request);
+    }
+
     @GetMapping("/me")
     public AuthDtos.Profile me(@AuthenticationPrincipal Jwt jwt) {
         return service.profile(jwt.getSubject());

@@ -34,7 +34,18 @@ public class UserService {
     }
 
     public List<UserDtos.Response> list() {
-        return memberships.findAllByCompanyId(CompanyContext.requireId()).stream().map(UserDtos.Response::from).toList();
+        return memberships.findAllByCompanyId(CompanyContext.requireId()).stream()
+                .filter(m -> !m.getRole().isCustomerRole()).map(UserDtos.Response::from).toList();
+    }
+
+    @Transactional
+    public UserDtos.Response approve(Long id) {
+        CompanyMembership membership = findMembership(id);
+        if (membership.getRole().isCustomerRole()) throw new BusinessException("L'account cliente non richiede approvazione");
+        if (membership.isApproved()) throw new BusinessException("La richiesta è già stata approvata");
+        membership.approve();
+        audit.record("USER_APPROVE", "USER", id, membership.getUser().getUsername());
+        return UserDtos.Response.from(membership);
     }
 
     /** La password iniziale è temporanea: al primo accesso l'utente deve sceglierne una sua. */

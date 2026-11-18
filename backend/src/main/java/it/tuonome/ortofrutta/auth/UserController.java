@@ -31,6 +31,11 @@ public class UserController {
         return roleService.options();
     }
 
+    @PostMapping("/{id}/approve")
+    public UserDtos.Response approve(@PathVariable Long id) {
+        return service.approve(id);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public UserDtos.Response create(@Valid @RequestBody UserDtos.CreateRequest request) {

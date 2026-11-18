@@ -50,7 +50,7 @@ export default function App() {
 
             <Route path="cassa" element={<Guard perm="SALES_CREATE"><CassaPage /></Guard>} />
             <Route path="magazzino" element={<Guard perm="STOCK_READ"><StockPage /></Guard>} />
-            <Route path="ordini" element={<Guard perm="SUPPLIER_ORDERS_MANAGE"><SupplierOrdersPage /></Guard>} />
+            <Route path="ordini" element={<Guard perm={['SUPPLIER_ORDER_CREATE', 'SUPPLIER_ORDERS_MANAGE']}><SupplierOrdersPage /></Guard>} />
             <Route path="prenotazioni" element={<Guard perm="RESERVATIONS_MANAGE"><ReservationsPage /></Guard>} />
             <Route
               path="clienti"
@@ -64,7 +64,7 @@ export default function App() {
             <Route path="report" element={<Guard perm="REPORTS_VIEW"><ReportPage /></Guard>} />
             <Route path="corrispettivi" element={<Guard perm="REPORTS_VIEW"><CorrispettiviPage /></Guard>} />
             <Route path="registro" element={<Guard perm="AUDIT_VIEW"><AuditPage /></Guard>} />
-            <Route path="utenti" element={<Guard perm="USERS_MANAGE"><UsersPage /></Guard>} />
+            <Route path="utenti" element={<Guard perm={['USERS_READ', 'USERS_MANAGE']}><UsersPage /></Guard>} />
             <Route path="ruoli" element={<Guard perm="ROLES_MANAGE"><RolesPage /></Guard>} />
             <Route path="tipologiche" element={<Guard perm="LOOKUPS_MANAGE"><LookupsPage /></Guard>} />
 

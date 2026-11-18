@@ -29,6 +29,9 @@ public class CompanyMembership {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    @Column(nullable = false)
+    private boolean approved = true;
+
     protected CompanyMembership() { }
 
     public CompanyMembership(Long companyId, AppUser user, AppRole role, Long customerId) {
@@ -38,8 +41,16 @@ public class CompanyMembership {
         this.customerId = customerId;
     }
 
+    public CompanyMembership(Long companyId, AppUser user, AppRole role, Long customerId,
+                             boolean enabled, boolean approved) {
+        this(companyId, user, role, customerId);
+        this.enabled = enabled;
+        this.approved = approved;
+    }
+
     public void setRole(AppRole role) { this.role = role; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public void approve() { this.approved = true; this.enabled = true; }
     public void setCustomerId(Long customerId) { this.customerId = customerId; }
 
     public Long getId() { return id; }
@@ -48,4 +59,5 @@ public class CompanyMembership {
     public AppRole getRole() { return role; }
     public Long getCustomerId() { return customerId; }
     public boolean isEnabled() { return enabled; }
+    public boolean isApproved() { return approved; }
 }

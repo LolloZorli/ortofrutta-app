@@ -21,6 +21,13 @@ public final class AuthDtos {
                                               @Size(max = 30) String phone,
                                               @NotBlank @Size(min = 8, max = 72) String password) { }
 
+    public record EmployeeRegistrationRequest(@NotBlank @Size(max = 120) String name,
+                                              @NotBlank @Email @Size(max = 254) String email,
+                                              @Size(max = 30) String phone,
+                                              @NotBlank @Size(min = 8, max = 72) String password) { }
+
+    public record EmployeeRegistrationResponse(String message, String status) { }
+
     public record Profile(String username, String displayName, String email, String roleCode, String roleName,
                           List<String> permissions, boolean mustChangePassword) {
         static Profile from(AppUser u, CompanyMembership membership) {

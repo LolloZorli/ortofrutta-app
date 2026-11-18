@@ -7,7 +7,7 @@ import { useLoad } from '../hooks'
 import type { Dashboard } from '../types'
 
 export default function DashboardPage() {
-  const { can } = useAuth()
+  const { can, canAny } = useAuth()
   const { data, loading, error, reload } = useLoad<Dashboard>(() => api.get('/reports/dashboard'))
 
   if (loading && !data) return <Loading />
@@ -80,7 +80,7 @@ export default function DashboardPage() {
                   <Chip tone="red">+{qty(i.suggestedQuantity, i.unit)}</Chip>
                 </div>
               ))}
-              {can('SUPPLIER_ORDERS_MANAGE') && (
+              {canAny('SUPPLIER_ORDER_CREATE', 'SUPPLIER_ORDERS_MANAGE') && (
                 <Link to="/ordini" className="btn dashboard-link">Prepara un ordine <span aria-hidden="true">→</span></Link>
               )}
             </div>
@@ -134,7 +134,7 @@ export default function DashboardPage() {
         </>
       )}
 
-      {can('SUPPLIER_ORDERS_MANAGE') && (
+      {canAny('SUPPLIER_ORDER_CREATE', 'SUPPLIER_ORDERS_MANAGE') && (
         <p className="muted center">
           Ordini aperti ai fornitori: <Link to="/ordini">{data.openSupplierOrders}</Link>
         </p>

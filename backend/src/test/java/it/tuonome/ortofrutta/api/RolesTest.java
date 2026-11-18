@@ -42,7 +42,7 @@ class RolesTest extends IntegrationTestBase {
     }
 
     @Test
-    void staffHasOnlyCounterPermissions() throws Exception {
+    void staffCanUseTheCounterAndCreateSupplierOrdersButCannotManageAdministration() throws Exception {
         String admin = admin();
         String staff = readyUser(admin, "giulia", "STAFF");
 
@@ -50,9 +50,11 @@ class RolesTest extends IntegrationTestBase {
                         .content("{\"name\":\"Vietato\",\"categoryId\":1,\"unitId\":1,\"salePrice\":1,\"vatRateId\":1}"))
                 .andExpect(status().isForbidden());
         for (String path : new String[]{"/api/users", "/api/roles", "/api/admin/lookups", "/api/audit",
-                "/api/suppliers", "/api/supplier-orders", "/api/reports/products", "/api/reports/corrispettivi"}) {
+                "/api/reports/products", "/api/reports/corrispettivi"}) {
             mvc.perform(get(path).header(AUTH, staff)).andExpect(status().isForbidden());
         }
+        mvc.perform(get("/api/suppliers").header(AUTH, staff)).andExpect(status().isOk());
+        mvc.perform(get("/api/supplier-orders").header(AUTH, staff)).andExpect(status().isOk());
         mvc.perform(post("/api/stock/receipts").header(AUTH, staff).contentType(JSON)
                         .content("{\"productId\":1,\"quantity\":1,\"unitCost\":1}"))
                 .andExpect(status().isForbidden());
@@ -61,6 +63,21 @@ class RolesTest extends IntegrationTestBase {
         for (String path : new String[]{"/api/products", "/api/lookups", "/api/customer-orders", "/api/reports/dashboard"}) {
             mvc.perform(get(path).header(AUTH, staff)).andExpect(status().isOk());
         }
+
+        long productId = createProduct(admin, "Ordine commesso " + System.nanoTime(), "KG", "2.00", "IVA_4");
+        String supplier = mvc.perform(post("/api/suppliers").header(AUTH, admin).contentType(JSON)
+                        .content("{\"name\":\"Fornitore ordine " + System.nanoTime() + "\"}"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long supplierId = json(supplier).get("id").asLong();
+        String createdOrder = mvc.perform(post("/api/supplier-orders").header(AUTH, staff).contentType(JSON)
+                        .content("{\"supplierId\":" + supplierId + ",\"lines\":[{\"productId\":"
+                                + productId + ",\"quantity\":3,\"unitCost\":1.20}]}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.lines[0].unitCost").value(nullValue()))
+                .andReturn().getResponse().getContentAsString();
+        long supplierOrderId = json(createdOrder).get("id").asLong();
+        mvc.perform(post("/api/supplier-orders/" + supplierOrderId + "/send").header(AUTH, staff))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -105,7 +122,12 @@ class RolesTest extends IntegrationTestBase {
                         .content("{\"name\":\"Prodotto responsabile\",\"categoryId\":1,\"unitId\":1,\"salePrice\":1,\"vatRateId\":1}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Prodotto responsabile"));
-        mvc.perform(get("/api/users").header(AUTH, manager)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/users").header(AUTH, manager)).andExpect(status().isOk());
+        mvc.perform(get("/api/customers").header(AUTH, manager)).andExpect(status().isOk());
+        mvc.perform(post("/api/users").header(AUTH, manager).contentType(JSON)
+                        .content("{\"username\":\"vietato\",\"password\":\"password123\",\"roleId\":"
+                                + roleId(admin, "STAFF") + "}"))
+                .andExpect(status().isForbidden());
         mvc.perform(post("/api/admin/lookups/CATEGORY").header(AUTH, manager).contentType(JSON)
                         .content("{\"name\":\"Non permesso\"}"))
                 .andExpect(status().isForbidden());

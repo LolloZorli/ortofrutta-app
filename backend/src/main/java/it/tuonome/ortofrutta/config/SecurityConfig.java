@@ -56,7 +56,7 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/api/auth/login", "/api/auth/register",
+                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/register-employee",
                                 "/actuator/health", "/actuator/health/**",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/companies").permitAll()
@@ -64,6 +64,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/me", "/api/auth/change-password").authenticated()
 
                         // amministrazione
+                        .requestMatchers(HttpMethod.GET, "/api/users/role-options")
+                                .hasAnyAuthority("USERS_READ", "USERS_MANAGE")
+                        .requestMatchers(HttpMethod.GET, "/api/users/**")
+                                .hasAnyAuthority("USERS_READ", "USERS_MANAGE")
+                        .requestMatchers(HttpMethod.POST, "/api/users/*/approve")
+                                .hasAnyAuthority("USERS_APPROVE", "USERS_MANAGE")
                         .requestMatchers("/api/users/**").hasAuthority("USERS_MANAGE")
                         .requestMatchers("/api/roles/**").hasAuthority("ROLES_MANAGE")
                         .requestMatchers("/api/admin/lookups/**").hasAuthority("LOOKUPS_MANAGE")
@@ -78,6 +84,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/suppliers/**")
                                 .hasAnyAuthority("SUPPLIERS_READ", "SUPPLIERS_MANAGE")
                         .requestMatchers("/api/suppliers/**").hasAuthority("SUPPLIERS_MANAGE")
+                        .requestMatchers(HttpMethod.GET, "/api/supplier-orders", "/api/supplier-orders/*")
+                                .hasAnyAuthority("SUPPLIER_ORDER_CREATE", "SUPPLIER_ORDERS_MANAGE")
+                        .requestMatchers(HttpMethod.POST, "/api/supplier-orders")
+                                .hasAnyAuthority("SUPPLIER_ORDER_CREATE", "SUPPLIER_ORDERS_MANAGE")
                         .requestMatchers("/api/supplier-orders/**").hasAuthority("SUPPLIER_ORDERS_MANAGE")
 
                         // magazzino
@@ -110,7 +120,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/reports/dashboard")
                                 .hasAnyAuthority("STOCK_READ", "SALES_CREATE", "REPORTS_VIEW", "SUPPLIER_ORDERS_MANAGE")
                         .requestMatchers("/api/reports/reorder-suggestions")
-                                .hasAnyAuthority("SUPPLIER_ORDERS_MANAGE", "REPORTS_VIEW")
+                                .hasAnyAuthority("SUPPLIER_ORDER_CREATE", "SUPPLIER_ORDERS_MANAGE", "REPORTS_VIEW")
 
                         // Le nuove rotte non devono diventare accessibili automaticamente a tutti gli utenti attivi.
                         .anyRequest().denyAll())
