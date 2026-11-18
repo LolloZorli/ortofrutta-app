@@ -36,6 +36,9 @@ class CompanyIsolationTest extends IntegrationTestBase {
         String adminB = loginFor(ownerB, "password123", slugB);
         long productA = createProductIn(adminA, slugA, "Pere A " + unique);
         long productB = createProductIn(adminB, slugB, "Pere B " + unique);
+        mvc.perform(post("/api/stock/receipts").header(AUTH, adminA).header(COMPANY, slugA).contentType(JSON)
+                        .content("{\"productId\":" + productA + ",\"quantity\":10,\"unitCost\":1.00}"))
+                .andExpect(status().isCreated());
 
         mvc.perform(post("/api/roles").header(AUTH, adminA).header(COMPANY, slugA).contentType(JSON)
                         .content("{\"name\":\"Ruolo privato " + unique + "\",\"permissions\":[\"STOCK_READ\"]}"))

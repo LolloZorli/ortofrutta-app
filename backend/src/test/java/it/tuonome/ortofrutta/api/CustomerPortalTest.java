@@ -22,6 +22,7 @@ class CustomerPortalTest extends IntegrationTestBase {
     void customerCanBrowseCatalogAndCreateAnOrderAtThePublishedPrice() throws Exception {
         String admin = admin();
         long productId = createProduct(admin, "Catalogo cliente " + System.nanoTime(), "KG", "3.40", "IVA_4");
+        receive(admin, productId, "10", "1.00");
         String email = "portale-" + System.nanoTime() + "@example.test";
         registerCustomer("Cliente Portale", email);
         String customer = login(email, "password123");
@@ -53,6 +54,7 @@ class CustomerPortalTest extends IntegrationTestBase {
     void customerCanReadOnlyTheirOwnOrdersAndCannotUseStaffOperations() throws Exception {
         String admin = admin();
         long productId = createProduct(admin, "Ordine privato " + System.nanoTime(), "KG", "2.00", "IVA_4");
+        receive(admin, productId, "10", "1.00");
         String emailA = "cliente-a-" + System.nanoTime() + "@example.test";
         String emailB = "cliente-b-" + System.nanoTime() + "@example.test";
         registerCustomer("Cliente A", emailA);
