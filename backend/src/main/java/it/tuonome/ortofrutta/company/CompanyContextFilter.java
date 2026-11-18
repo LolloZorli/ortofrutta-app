@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.UnexpectedRollbackException;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -58,6 +59,10 @@ public class CompanyContextFilter extends OncePerRequestFilter {
             if (e.getCause() instanceof IOException io) throw io;
             if (e.getCause() instanceof ServletException servlet) throw servlet;
             throw e;
+        } catch (UnexpectedRollbackException e) {
+            // MVC may translate a service exception to a 4xx response while the joined service
+            // transaction marks this request transaction rollback-only. Preserve that response.
+            if (response.getStatus() < 400) throw e;
         } finally {
             CompanyContext.clear();
         }
