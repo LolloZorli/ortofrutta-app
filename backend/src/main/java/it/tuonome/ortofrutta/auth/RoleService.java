@@ -3,6 +3,8 @@ package it.tuonome.ortofrutta.auth;
 import it.tuonome.ortofrutta.audit.AuditService;
 import it.tuonome.ortofrutta.common.BusinessException;
 import it.tuonome.ortofrutta.common.NotFoundException;
+import it.tuonome.ortofrutta.company.CompanyContext;
+import it.tuonome.ortofrutta.company.CompanyMembershipRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,13 +29,13 @@ public class RoleService {
             Permission.STOCK_RECEIVE, Permission.SUPPLIER_ORDERS_MANAGE);
 
     private final RoleRepository roles;
-    private final UserRepository users;
     private final AuditService audit;
+    private final CompanyMembershipRepository memberships;
 
-    public RoleService(RoleRepository roles, UserRepository users, AuditService audit) {
+    public RoleService(RoleRepository roles, AuditService audit, CompanyMembershipRepository memberships) {
         this.roles = roles;
-        this.users = users;
         this.audit = audit;
+        this.memberships = memberships;
     }
 
     public List<RoleDtos.Response> list() {
@@ -80,7 +82,7 @@ public class RoleService {
         if (role.isSystemRole()) {
             throw new BusinessException("Questo ruolo di sistema non si può eliminare");
         }
-        long inUse = users.countByRoleId(id);
+        long inUse = memberships.countByCompanyIdAndRoleId(CompanyContext.requireId(), id);
         if (inUse > 0) {
             throw new BusinessException("Il ruolo è assegnato a " + inUse + " utenti: riassegnali prima di eliminarlo");
         }
@@ -110,7 +112,7 @@ public class RoleService {
     private RoleDtos.Response toResponse(AppRole r) {
         return new RoleDtos.Response(r.getId(), r.getCode(), r.getName(), r.getDescription(), r.isSystemRole(),
                 r.effectivePermissions().stream().map(Enum::name).sorted().toList(),
-                users.countByRoleId(r.getId()));
+                memberships.countByCompanyIdAndRoleId(CompanyContext.requireId(), r.getId()));
     }
 
     private AppRole find(Long id) {

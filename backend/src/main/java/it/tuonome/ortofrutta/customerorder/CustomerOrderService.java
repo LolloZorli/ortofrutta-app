@@ -6,6 +6,8 @@ import it.tuonome.ortofrutta.customer.Customer;
 import it.tuonome.ortofrutta.customer.CustomerRepository;
 import it.tuonome.ortofrutta.auth.UserRepository;
 import it.tuonome.ortofrutta.auth.AppUser;
+import it.tuonome.ortofrutta.company.CompanyContext;
+import it.tuonome.ortofrutta.company.CompanyMembershipRepository;
 import it.tuonome.ortofrutta.product.Product;
 import it.tuonome.ortofrutta.product.ProductRepository;
 import it.tuonome.ortofrutta.lookup.LookupService;
@@ -21,8 +23,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Prenotazioni dei clienti: NEW → READY → PICKED_UP.
- * Al ritiro la merce viene venduta (scalata dai lotti in FIFO): se manca, il ritiro viene rifiutato.
+ * Ordini dei clienti: NEW → READY → PICKED_UP/DELIVERED.
+ * Al completamento la merce viene venduta (scalata dai lotti in FIFO): se manca, l'operazione viene rifiutata.
  */
 @Service
 @Transactional(readOnly = true)
@@ -37,15 +39,18 @@ public class CustomerOrderService {
     private final SaleService sales;
     private final LookupService lookups;
     private final UserRepository users;
+    private final CompanyMembershipRepository memberships;
 
     public CustomerOrderService(CustomerOrderRepository orders, CustomerRepository customers,
-                                ProductRepository products, SaleService sales, LookupService lookups, UserRepository users) {
+                                ProductRepository products, SaleService sales, LookupService lookups, UserRepository users,
+                                CompanyMembershipRepository memberships) {
         this.orders = orders;
         this.customers = customers;
         this.products = products;
         this.sales = sales;
         this.lookups = lookups;
         this.users = users;
+        this.memberships = memberships;
     }
 
     /** Aperte: tutte. Storico: le ultime 100. */
@@ -69,7 +74,11 @@ public class CustomerOrderService {
         }
         Customer customer = customers.findById(customerIdFor(username))
                 .orElseThrow(() -> new NotFoundException("Profilo cliente", null));
-        CustomerOrder order = new CustomerOrder(customer, request.pickupDate(), request.notes());
+        validateDelivery(request.fulfillmentType(), request.deliveryAddress(), request.deliveryCity(),
+                request.deliveryPostalCode(), request.deliveryPhone());
+        CustomerOrder order = new CustomerOrder(customer, request.pickupDate(), request.notes(),
+                request.fulfillmentType(), request.deliveryAddress(), request.deliveryCity(),
+                request.deliveryPostalCode(), request.deliveryPhone(), request.deliveryNotes());
         for (CustomerOrderDtos.CustomerLineRequest line : request.lines()) {
             Product product = products.findById(line.productId())
                     .orElseThrow(() -> new NotFoundException("Prodotto", line.productId()));
@@ -88,7 +97,9 @@ public class CustomerOrderService {
     public CustomerOrderDtos.Response create(CustomerOrderDtos.Request r, boolean canOverridePrice) {
         Customer customer = customers.findById(r.customerId())
                 .orElseThrow(() -> new NotFoundException("Cliente", r.customerId()));
-        CustomerOrder order = new CustomerOrder(customer, r.pickupDate(), r.notes());
+        validateDelivery(r.fulfillmentType(), r.deliveryAddress(), r.deliveryCity(), r.deliveryPostalCode(), r.deliveryPhone());
+        CustomerOrder order = new CustomerOrder(customer, r.pickupDate(), r.notes(), r.fulfillmentType(),
+                r.deliveryAddress(), r.deliveryCity(), r.deliveryPostalCode(), r.deliveryPhone(), r.deliveryNotes());
         for (CustomerOrderDtos.LineRequest l : r.lines()) {
             Product p = products.findById(l.productId())
                     .orElseThrow(() -> new NotFoundException("Prodotto", l.productId()));
@@ -111,6 +122,7 @@ public class CustomerOrderService {
     @Transactional
     public CustomerOrderDtos.Response pickUp(Long id, Long paymentMethodId) {
         CustomerOrder o = find(id);
+        if (o.isDelivery()) throw new BusinessException("Questo ordine è previsto per la consegna a domicilio");
         if (!OPEN.contains(o.getStatus())) {
             throw new BusinessException("Questa prenotazione è già chiusa");
         }
@@ -121,6 +133,20 @@ public class CustomerOrderService {
         }
         sales.create(items, paymentMethodId, o.getCustomer().getId());
         o.setStatus(CustomerOrderStatus.PICKED_UP);
+        return CustomerOrderDtos.Response.from(o, lookups);
+    }
+
+    @Transactional
+    public CustomerOrderDtos.Response deliver(Long id, Long paymentMethodId) {
+        CustomerOrder o = find(id);
+        if (!o.isDelivery()) throw new BusinessException("Questo ordine è previsto per il ritiro in negozio");
+        if (!OPEN.contains(o.getStatus())) throw new BusinessException("Questo ordine è già chiuso");
+        List<SaleItem> items = new ArrayList<>();
+        for (CustomerOrderLine line : o.getLines()) {
+            items.add(new SaleItem(line.getProduct().getId(), line.getQuantity(), line.getUnitPrice()));
+        }
+        sales.create(items, paymentMethodId, o.getCustomer().getId());
+        o.setStatus(CustomerOrderStatus.DELIVERED);
         return CustomerOrderDtos.Response.from(o, lookups);
     }
 
@@ -140,7 +166,17 @@ public class CustomerOrderService {
 
     private Long customerIdFor(String username) {
         AppUser user = users.findByUsername(username).orElseThrow(() -> new NotFoundException("Account", null));
-        if (user.getCustomerId() == null) throw new BusinessException("L'account non è collegato a un profilo cliente");
-        return user.getCustomerId();
+        Long customerId = memberships.findActiveByCompanyAndUserId(CompanyContext.requireId(), user.getId())
+                .map(m -> m.getCustomerId()).orElse(null);
+        if (customerId == null) throw new BusinessException("L'account non è collegato a un profilo cliente in questa azienda");
+        return customerId;
     }
+
+    private static void validateDelivery(FulfillmentType type, String address, String city, String postalCode, String phone) {
+        if (type == FulfillmentType.DELIVERY && (blank(address) || blank(city) || blank(postalCode) || blank(phone))) {
+            throw new BusinessException("Per la consegna indica indirizzo, città, CAP e telefono");
+        }
+    }
+
+    private static boolean blank(String value) { return value == null || value.isBlank(); }
 }

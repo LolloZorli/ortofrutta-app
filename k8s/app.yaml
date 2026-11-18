@@ -97,6 +97,9 @@ metadata:
     app: ortofrutta-backend
 spec:
   replicas: 1
+  # V8 adds tenant scoping. Do not run an old backend beside the new schema during migration.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: ortofrutta-backend

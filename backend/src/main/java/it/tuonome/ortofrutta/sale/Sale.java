@@ -1,6 +1,8 @@
 package it.tuonome.ortofrutta.sale;
 
+import it.tuonome.ortofrutta.company.CompanyScopedEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -8,7 +10,8 @@ import java.time.Instant;
 /** Una vendita di cassa: può contenere più prodotti, ha un metodo di pagamento e si può stornare. */
 @Entity
 @Table(name = "sales")
-public class Sale {
+@SQLRestriction(CompanyScopedEntity.RESTRICTION)
+public class Sale extends CompanyScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

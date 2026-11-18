@@ -1,10 +1,13 @@
 package it.tuonome.ortofrutta.supplier;
 
+import it.tuonome.ortofrutta.company.CompanyScopedEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "suppliers")
-public class Supplier {
+@SQLRestriction(CompanyScopedEntity.RESTRICTION)
+public class Supplier extends CompanyScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

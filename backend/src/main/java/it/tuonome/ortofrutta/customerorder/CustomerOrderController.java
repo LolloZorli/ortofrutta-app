@@ -3,7 +3,6 @@ package it.tuonome.ortofrutta.customerorder;
 import it.tuonome.ortofrutta.auth.Authz;
 import it.tuonome.ortofrutta.auth.Permission;
 import jakarta.validation.Valid;
-import org.springframework.security.core.Authentication;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
@@ -53,6 +52,12 @@ public class CustomerOrderController {
     public CustomerOrderDtos.Response pickUp(@PathVariable Long id,
                                              @Valid @RequestBody CustomerOrderDtos.PickupRequest request) {
         return service.pickUp(id, request.paymentMethodId());
+    }
+
+    @PostMapping("/{id}/deliver")
+    public CustomerOrderDtos.Response deliver(@PathVariable Long id,
+                                              @Valid @RequestBody CustomerOrderDtos.PickupRequest request) {
+        return service.deliver(id, request.paymentMethodId());
     }
 
     @PostMapping("/{id}/cancel")

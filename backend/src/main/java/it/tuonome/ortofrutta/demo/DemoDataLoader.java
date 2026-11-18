@@ -4,6 +4,9 @@ import it.tuonome.ortofrutta.auth.AppRole;
 import it.tuonome.ortofrutta.auth.AppUser;
 import it.tuonome.ortofrutta.auth.RoleRepository;
 import it.tuonome.ortofrutta.auth.UserRepository;
+import it.tuonome.ortofrutta.company.CompanyContext;
+import it.tuonome.ortofrutta.company.CompanyMembership;
+import it.tuonome.ortofrutta.company.CompanyMembershipRepository;
 import it.tuonome.ortofrutta.customer.CustomerDtos;
 import it.tuonome.ortofrutta.customer.CustomerService;
 import it.tuonome.ortofrutta.customerorder.CustomerOrderDtos;
@@ -40,6 +43,7 @@ public class DemoDataLoader implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(DemoDataLoader.class);
 
     private final UserRepository users;
+    private final CompanyMembershipRepository memberships;
     private final RoleRepository roles;
     private final PasswordEncoder encoder;
     private final ProductRepository productRepository;
@@ -51,12 +55,13 @@ public class DemoDataLoader implements ApplicationRunner {
     private final CustomerOrderService customerOrders;
     private final LookupService lookups;
 
-    public DemoDataLoader(UserRepository users, RoleRepository roles, PasswordEncoder encoder,
+    public DemoDataLoader(UserRepository users, CompanyMembershipRepository memberships, RoleRepository roles, PasswordEncoder encoder,
                           ProductRepository productRepository, ProductService products,
                           SupplierService suppliers, CustomerService customers,
                           StockService stock, SaleService sales, CustomerOrderService customerOrders,
                           LookupService lookups) {
         this.users = users;
+        this.memberships = memberships;
         this.roles = roles;
         this.encoder = encoder;
         this.productRepository = productRepository;
@@ -143,7 +148,8 @@ public class DemoDataLoader implements ApplicationRunner {
             return;
         }
         AppRole role = roles.findByCode(roleCode).orElseThrow();
-        users.save(new AppUser(username, encoder.encode(password), role, false));
+        AppUser user = users.save(new AppUser(username, encoder.encode(password), role, false));
+        memberships.save(new CompanyMembership(CompanyContext.LEGACY_COMPANY_ID, user, role, null));
     }
 
     private long id(LookupType type, String code) {

@@ -2,6 +2,12 @@ import type { Profile } from './types'
 
 const TOKEN_KEY = 'ortofrutta.token'
 const PROFILE_KEY = 'ortofrutta.profile'
+const COMPANY_KEY = 'ortofrutta.company'
+
+export const companySession = {
+  slug: () => localStorage.getItem(COMPANY_KEY) ?? 'ortofrutta',
+  select: (slug: string) => localStorage.setItem(COMPANY_KEY, slug.trim().toLowerCase()),
+}
 
 export const session = {
   token: () => localStorage.getItem(TOKEN_KEY),
@@ -45,6 +51,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const headers: Record<string, string> = {}
   const token = session.token()
   if (token) headers.Authorization = `Bearer ${token}`
+  if (path !== '/companies' && path !== '/companies/register') {
+    headers['X-Company-Slug'] = companySession.slug()
+  }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
 
   let res: Response

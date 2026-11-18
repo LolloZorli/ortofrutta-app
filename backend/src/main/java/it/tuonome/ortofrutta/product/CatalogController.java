@@ -1,5 +1,6 @@
 package it.tuonome.ortofrutta.product;
 
+import it.tuonome.ortofrutta.company.CompanyContext;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,9 +21,9 @@ public class CatalogController {
     public List<Item> list() {
         return jdbc.sql("""
                 select p.id, p.name, c.name as category, u.short_label as unit, p.sale_price
-                from products p join categories c on c.id=p.category_id join units u on u.id=p.unit_id
-                where p.active order by p.name
-                """).query((rs, n) -> new Item(rs.getLong("id"), rs.getString("name"),
+                from products p join product_categories c on c.id=p.category_id join units u on u.id=p.unit_id
+                where p.active and p.company_id = :companyId order by p.name
+                """).param("companyId", CompanyContext.requireId()).query((rs, n) -> new Item(rs.getLong("id"), rs.getString("name"),
                 rs.getString("category"), rs.getString("unit"), rs.getBigDecimal("sale_price"))).list();
     }
 }

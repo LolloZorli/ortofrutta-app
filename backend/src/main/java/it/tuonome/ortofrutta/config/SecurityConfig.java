@@ -1,6 +1,8 @@
 package it.tuonome.ortofrutta.config;
 
 import it.tuonome.ortofrutta.auth.UserJwtAuthenticationConverter;
+import it.tuonome.ortofrutta.company.CompanyContextFilter;
+import it.tuonome.ortofrutta.company.CompanyRepository;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
@@ -21,6 +23,10 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -40,7 +46,10 @@ public class SecurityConfig {
      */
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                            UserJwtAuthenticationConverter jwtConverter) throws Exception {
+                                            UserJwtAuthenticationConverter jwtConverter,
+                                            CompanyRepository companies,
+                                            PlatformTransactionManager transactionManager,
+                                            JdbcClient jdbc) throws Exception {
         http
                 .csrf(csrf -> csrf.disable()) // API stateless con token Bearer: niente cookie, niente CSRF
                 .cors(cors -> { })
@@ -50,6 +59,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login", "/api/auth/register",
                                 "/actuator/health", "/actuator/health/**",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/companies").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/companies/register").permitAll()
                         .requestMatchers("/api/auth/me", "/api/auth/change-password").authenticated()
 
                         // amministrazione
@@ -104,6 +115,8 @@ public class SecurityConfig {
                         // Le nuove rotte non devono diventare accessibili automaticamente a tutti gli utenti attivi.
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter)));
+        http.addFilterBefore(new CompanyContextFilter(companies, new TransactionTemplate(transactionManager), jdbc),
+                BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 
@@ -119,7 +132,7 @@ public class SecurityConfig {
                 .map(String::trim).filter(origin -> !origin.isEmpty()).toList();
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", CompanyContextFilter.HEADER));
         configuration.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);

@@ -4,6 +4,7 @@ import it.tuonome.ortofrutta.audit.AuditService;
 import it.tuonome.ortofrutta.common.BusinessException;
 import it.tuonome.ortofrutta.common.CurrentUser;
 import it.tuonome.ortofrutta.common.NotFoundException;
+import it.tuonome.ortofrutta.company.CompanyContext;
 import it.tuonome.ortofrutta.common.PageResponse;
 import it.tuonome.ortofrutta.lookup.LookupItem;
 import it.tuonome.ortofrutta.lookup.LookupService;
@@ -142,7 +143,8 @@ public class SaleService {
 
     private String customerName(Long customerId) {
         if (customerId == null) return null;
-        return jdbc.sql("select name from customers where id = :id").param("id", customerId)
+        return jdbc.sql("select name from customers where company_id = :companyId and id = :id")
+                .param("companyId", CompanyContext.requireId()).param("id", customerId)
                 .query(String.class).optional().orElse(null);
     }
 
@@ -151,12 +153,12 @@ public class SaleService {
         return jdbc.sql("""
                 select p.name, u.short_label, m.unit_price, sum(m.quantity) as qty
                 from stock_movements m
-                join products p on p.id = m.product_id
-                join units u on u.id = p.unit_id
-                where m.sale_id = :id and m.type = 'SALE'
+                join products p on p.id = m.product_id and p.company_id = m.company_id
+                join units u on u.id = p.unit_id and u.company_id = p.company_id
+                where m.company_id = :companyId and m.sale_id = :id and m.type = 'SALE'
                 group by p.name, u.short_label, m.unit_price
                 order by p.name, m.unit_price
-                """).param("id", saleId).query((rs, n) -> {
+                """).param("companyId", CompanyContext.requireId()).param("id", saleId).query((rs, n) -> {
             BigDecimal qty = rs.getBigDecimal("qty");
             BigDecimal price = rs.getBigDecimal("unit_price");
             return new SaleDtos.Line(rs.getString("name"), rs.getString("short_label"), qty, price,

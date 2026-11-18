@@ -1,6 +1,6 @@
 # Ortofrutta
 
-Gestionale per il banco di frutta e verdura: **cassa**, **magazzino a lotti**, **scarti**, **margini reali**,
+Piattaforma multi-azienda per ortofrutta: ogni negozio gestisce **cassa**, **magazzino a lotti**, **scarti**, **margini reali**,
 **ordini ai fornitori** (anche via WhatsApp), **prenotazioni dei clienti**, **corrispettivi giornalieri** e **registro delle attività**.
 Interfaccia pensata per il telefono, da usare con una mano dietro al banco.
 
@@ -14,14 +14,14 @@ Interfaccia pensata per il telefono, da usare con una mano dietro al banco.
 | **Magazzino** | Giacenze, conteggio fisico con rettifica tracciata, lotti con scadenza, carico merce, scarti con motivo, storico movimenti paginato con l'operatore |
 | **Lotti FIFO** | Ogni arrivo è un lotto con costo e scadenza; le vendite consumano prima il più vecchio, così il margine è reale |
 | **Ordini fornitori** | Bozza, invio (link WhatsApp), arrivo merce con correzione di quantità/costo; precompilazione dai prodotti sotto scorta |
-| **Prenotazioni** | Nuova → Pronta → Ritirata. Il ritiro diventa una vendita di cassa con il suo metodo di pagamento |
+| **Ordini clienti** | Ritiro in negozio o consegna a domicilio, con data, indirizzo e telefono. Nuovo → In preparazione → Ritirato/Consegnato. Il completamento crea la vendita e scarica il magazzino |
 | **Corrispettivi** | Riepilogo giornaliero per aliquota IVA (imponibile e imposta scorporati) e per metodo di pagamento; chiusura contanti con differenza tra atteso e contato |
 | **Clienti** | Anagrafica e storico acquisti associati alle vendite |
 | **Portale clienti** | Registrazione con email e password, catalogo senza giacenze interne, invio e consultazione dei propri ordini |
 | **Cartellini** | Stampa dei cartellini prezzo dei prodotti attivi e filtrati |
 | **Report** | Incasso, valore magazzino, margine, scarti, più venduti, lotti in scadenza, report per prodotto |
 | **Tipologiche** | Categorie, unità di misura, aliquote IVA, origini, motivi di scarto, metodi di pagamento, tipi di cliente: **solo l'admin le gestisce** |
-| **Ruoli e permessi** | Ruoli personalizzabili con permessi granulari; 4 ruoli operativi e un ruolo Cliente |
+| **Ruoli e permessi** | Ruoli e permessi indipendenti per ogni azienda; 4 ruoli operativi e il ruolo Cliente |
 | **Registro attività** | Chi ha cambiato prezzi, utenti, ruoli, tipologiche, chi ha stornato una vendita |
 
 ## Tipologiche (tabelle di decodifica)
@@ -68,6 +68,23 @@ Dall'app (*Altro → Ruoli e permessi*) puoi creare altri ruoli scegliendo i per
 - Chi non ha `COSTS_VIEW` non riceve mai costi di acquisto né margini; chi non ha `SALES_PRICE_OVERRIDE` vende sempre a listino.
 - **Password temporanee**: finché l'utente non ne sceglie una sua, il server non gli concede nessun permesso. Vale anche per il primo accesso dell'admin.
 - Un amministratore non può cambiare il proprio ruolo o disattivarsi.
+
+## Aziende e isolamento dei dati
+
+Ogni ortofrutta può registrarsi dalla schermata di accesso. Ogni azienda ha un catalogo, fornitori, clienti,
+ruoli, utenti, magazzino, vendite e ordini separati. L'API seleziona l'azienda con l'header `X-Company-Slug`;
+il frontend lo imposta quando si sceglie il negozio. I token vengono verificati contro l'iscrizione dell'utente
+a quell'azienda, e permessi e record vengono riletti nel contesto dell'azienda per ogni richiesta.
+
+L'identità di accesso del cliente è condivisa: per aggiungere un altro negozio allo stesso account, seleziona
+quel negozio, scegli la registrazione cliente e inserisci la stessa email e password. Verrà creato un profilo
+cliente distinto per l'azienda; ordini e dati personali di negozi diversi restano separati. I dati già presenti
+nel database vengono migrati nell'azienda `ortofrutta` senza cancellarli.
+
+Nel portale ordini il cliente sceglie tra ritiro e consegna a domicilio. Per la consegna inserisce indirizzo,
+città, CAP e telefono; il negozio vede i dettagli, prepara l'ordine e registra la consegna con il metodo di
+pagamento, generando la vendita e lo scarico del magazzino. La data resta una data (senza fascia oraria). Non
+sono ancora configurabili tariffe o zone di consegna per azienda: per ora l'ordine non aggiunge costi di consegna.
 
 ## Efficienza
 
@@ -213,6 +230,8 @@ Se Testcontainers segnala che l'API Docker `1.32` è troppo vecchia, imposta
 - `RolesTest`: permessi dei ruoli operativi e Cliente, registrazione cliente, ruoli personalizzati, permessi riservati, password temporanee, utenti disattivati
 - `LookupsTest`: solo l'admin crea tipologiche, duplicati, valori disattivati, regole su unità e IVA
 - `SalesTest`: carrello, storno, corrispettivi per IVA (con vendite stornate escluse), ritiro prenotazioni, vendite visibili solo al proprio autore
+- `CustomerPortalTest`: catalogo senza costi o giacenze, ordine al prezzo di listino, consegna a domicilio, completamento con vendita e visibilità limitata ai propri ordini
+- `CompanyIsolationTest`: registrazione aziende, utenti e ruoli separati, cataloghi e ordini isolati, account cliente condiviso fra negozi
 
 I test di integrazione condividono **un solo PostgreSQL** (Testcontainers) e un solo contesto Spring.
 
@@ -224,12 +243,12 @@ I test di integrazione condividono **un solo PostgreSQL** (Testcontainers) e un 
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Amministratore creato al primo avvio | `admin` / `admin123` |
 | `ADMIN_MUST_CHANGE_PASSWORD` | Obbliga a cambiare la password al primo accesso | `true` |
 | `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` | Database | `localhost:5433/ortofrutta` dal PC; `db:5432/ortofrutta` nei container |
+| `X-Company-Slug` | Azienda selezionata per le API | `ortofrutta` |
 | `SPRING_PROFILES_ACTIVE=demo` | Carica dati di prova | disattivo |
 
 ## Limiti noti
 
 - Non sostituisce il registratore di cassa: i **corrispettivi** dell'app sono un prospetto interno, non la trasmissione fiscale.
-- Un solo negozio (non multi-tenant).
 - Il token resta valido fino a scadenza (8 ore) ma ogni richiesta ricontrolla l'utente; manca un "esci da tutti i dispositivi".
 - I dati personali dei clienti richiedono informativa e misure GDPR per un uso commerciale.
 

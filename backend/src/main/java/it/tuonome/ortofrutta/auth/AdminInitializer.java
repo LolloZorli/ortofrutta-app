@@ -1,6 +1,9 @@
 package it.tuonome.ortofrutta.auth;
 
 import it.tuonome.ortofrutta.config.AppProperties;
+import it.tuonome.ortofrutta.company.CompanyContext;
+import it.tuonome.ortofrutta.company.CompanyMembership;
+import it.tuonome.ortofrutta.company.CompanyMembershipRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -21,12 +24,15 @@ public class AdminInitializer implements ApplicationRunner {
     private final RoleRepository roles;
     private final PasswordEncoder encoder;
     private final AppProperties props;
+    private final CompanyMembershipRepository memberships;
 
-    public AdminInitializer(UserRepository users, RoleRepository roles, PasswordEncoder encoder, AppProperties props) {
+    public AdminInitializer(UserRepository users, RoleRepository roles, PasswordEncoder encoder, AppProperties props,
+                            CompanyMembershipRepository memberships) {
         this.users = users;
         this.roles = roles;
         this.encoder = encoder;
         this.props = props;
+        this.memberships = memberships;
     }
 
     @Override
@@ -39,7 +45,8 @@ public class AdminInitializer implements ApplicationRunner {
                 .orElseThrow(() -> new IllegalStateException("Ruolo ADMIN mancante: migrazione V3 non applicata?"));
         String username = props.admin().username().trim().toLowerCase(Locale.ROOT);
         boolean mustChange = props.admin().mustChangePassword();
-        users.save(new AppUser(username, encoder.encode(props.admin().password()), admin, mustChange));
+        AppUser user = users.save(new AppUser(username, encoder.encode(props.admin().password()), admin, mustChange));
+        memberships.save(new CompanyMembership(CompanyContext.LEGACY_COMPANY_ID, user, admin, null));
         log.warn("Creato amministratore '{}'{}.", username,
                 mustChange ? ": dovrà cambiare la password al primo accesso" : " (cambio password NON richiesto)");
     }

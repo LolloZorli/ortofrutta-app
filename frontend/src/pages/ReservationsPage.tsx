@@ -13,6 +13,7 @@ const STATUS: Record<ReservationStatus, { label: string; tone: 'blue' | 'green' 
   NEW: { label: 'Nuova', tone: 'blue' },
   READY: { label: 'Pronta', tone: 'green' },
   PICKED_UP: { label: 'Ritirata', tone: 'gray' },
+  DELIVERED: { label: 'Consegnata', tone: 'green' },
   CANCELLED: { label: 'Annullata', tone: 'red' },
 }
 
@@ -70,8 +71,9 @@ function ReservationCard({ reservation: r, onChanged }: { reservation: Reservati
   const [picking, setPicking] = useState(false)
   const st = STATUS[r.status]
   const open = r.status === 'NEW' || r.status === 'READY'
+  const contactPhone = r.fulfillmentType === 'DELIVERY' ? r.deliveryPhone : r.customerPhone
 
-  async function act(action: 'ready' | 'pickup' | 'cancel', okMessage: string, body?: unknown) {
+  async function act(action: 'ready' | 'pickup' | 'deliver' | 'cancel', okMessage: string, body?: unknown) {
     setBusy(true)
     try {
       await api.post(`/customer-orders/${r.id}/${action}`, body)
@@ -89,10 +91,14 @@ function ReservationCard({ reservation: r, onChanged }: { reservation: Reservati
       <div className="row between">
         <div>
           <div className="item-title">{r.customerName}</div>
-          <div className="item-sub">Ritiro: {dateIt(r.pickupDate)}</div>
+          <div className="item-sub">{r.fulfillmentType === 'DELIVERY' ? 'Consegna' : 'Ritiro'}: {dateIt(r.pickupDate)}</div>
         </div>
         <Chip tone={st.tone}>{st.label}</Chip>
       </div>
+      {r.fulfillmentType === 'DELIVERY' && <div className="item-sub" style={{ marginTop: 8 }}>
+        <strong>Indirizzo:</strong> {r.deliveryAddress}, {r.deliveryPostalCode} {r.deliveryCity}<br />
+        <strong>Telefono:</strong> {r.deliveryPhone}{r.deliveryNotes && <><br /><strong>Istruzioni:</strong> {r.deliveryNotes}</>}
+      </div>}
       <ul className="lines-summary">
         {r.lines.map((l) => (
           <li key={l.id}>
@@ -113,13 +119,13 @@ function ReservationCard({ reservation: r, onChanged }: { reservation: Reservati
             </button>
           )}
           <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => setPicking(true)}>
-            Ritirata
+            {r.fulfillmentType === 'DELIVERY' ? 'Segna consegnata' : 'Ritirata'}
           </button>
           <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => act('cancel', 'Prenotazione annullata')}>
             Annulla
           </button>
-          {r.customerPhone && (
-            <a className="btn btn-sm" href={`tel:${r.customerPhone.replace(/\s/g, '')}`}>
+          {contactPhone && (
+            <a className="btn btn-sm" href={`tel:${contactPhone.replace(/\s/g, '')}`}>
               Chiama
             </a>
           )}
@@ -131,7 +137,9 @@ function ReservationCard({ reservation: r, onChanged }: { reservation: Reservati
           onClose={() => setPicking(false)}
           onPay={(paymentMethodId) => {
             setPicking(false)
-            void act('pickup', 'Ritirata e incassata: magazzino aggiornato', { paymentMethodId })
+            void act(r.fulfillmentType === 'DELIVERY' ? 'deliver' : 'pickup',
+              r.fulfillmentType === 'DELIVERY' ? 'Consegna registrata e incassata: magazzino aggiornato' : 'Ritirata e incassata: magazzino aggiornato',
+              { paymentMethodId })
           }}
         />
       )}
@@ -139,7 +147,7 @@ function ReservationCard({ reservation: r, onChanged }: { reservation: Reservati
   )
 }
 
-/** Il ritiro diventa una vendita di cassa: serve il metodo di pagamento. */
+/** Il completamento dell'ordine diventa una vendita di cassa: serve il metodo di pagamento. */
 function PickupForm({
   reservation,
   onClose,
@@ -155,7 +163,7 @@ function PickupForm({
   const method = selected ?? methods[0]?.id ?? null
 
   return (
-    <Modal title={`Ritiro di ${reservation.customerName}`} onClose={onClose}>
+    <Modal title={`${reservation.fulfillmentType === 'DELIVERY' ? 'Consegna' : 'Ritiro'} di ${reservation.customerName}`} onClose={onClose}>
       <div className="price-line">
         <span className="muted">Da incassare</span>
         <strong>{eur(reservation.total)}</strong>
@@ -168,7 +176,7 @@ function PickupForm({
         ))}
       </div>
       <button className="btn btn-primary btn-block" disabled={method === null} onClick={() => method !== null && onPay(method)}>
-        Incassa e consegna
+        {reservation.fulfillmentType === 'DELIVERY' ? 'Conferma consegna e incassa' : 'Incassa e consegna'}
       </button>
     </Modal>
   )
@@ -188,6 +196,12 @@ function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
   const [pickupDate, setPickupDate] = useState(tomorrowIso())
+  const [fulfillmentType, setFulfillmentType] = useState<'PICKUP' | 'DELIVERY'>('PICKUP')
+  const [deliveryAddress, setDeliveryAddress] = useState('')
+  const [deliveryCity, setDeliveryCity] = useState('')
+  const [deliveryPostalCode, setDeliveryPostalCode] = useState('')
+  const [deliveryPhone, setDeliveryPhone] = useState('')
+  const [deliveryNotes, setDeliveryNotes] = useState('')
   const [notes, setNotes] = useState('')
   const [lines, setLines] = useState<DraftLine[]>([{ productId: '', quantity: '' }])
   const [busy, setBusy] = useState(false)
@@ -209,6 +223,9 @@ function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
       body.push({ productId: Number(l.productId), quantity: q })
     }
     if (body.length === 0) return toast.error('Aggiungi almeno un prodotto')
+    if (fulfillmentType === 'DELIVERY' && (!deliveryAddress.trim() || !deliveryCity.trim() || !deliveryPostalCode.trim() || !deliveryPhone.trim())) {
+      return toast.error('Per la consegna indica indirizzo, città, CAP e telefono')
+    }
 
     setBusy(true)
     try {
@@ -217,7 +234,14 @@ function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
         const created = await api.post<Customer>('/customers', { name: newName.trim(), phone: newPhone.trim() || null })
         id = created.id
       }
-      await api.post('/customer-orders', { customerId: id, pickupDate, notes: notes.trim() || null, lines: body })
+      await api.post('/customer-orders', {
+        customerId: id, pickupDate, notes: notes.trim() || null, lines: body, fulfillmentType,
+        deliveryAddress: fulfillmentType === 'DELIVERY' ? deliveryAddress.trim() : null,
+        deliveryCity: fulfillmentType === 'DELIVERY' ? deliveryCity.trim() : null,
+        deliveryPostalCode: fulfillmentType === 'DELIVERY' ? deliveryPostalCode.trim() : null,
+        deliveryPhone: fulfillmentType === 'DELIVERY' ? deliveryPhone.trim() : null,
+        deliveryNotes: fulfillmentType === 'DELIVERY' ? deliveryNotes.trim() || null : null,
+      })
       toast.ok('Prenotazione creata')
       onCreated()
     } catch (err) {
@@ -259,9 +283,21 @@ function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
           </>
         )}
 
-        <Field label="Data di ritiro">
+        <Field label="Modalità di evasione"><select value={fulfillmentType} onChange={(e) => setFulfillmentType(e.target.value as 'PICKUP' | 'DELIVERY')}>
+          <option value="PICKUP">Ritiro in negozio</option><option value="DELIVERY">Consegna a domicilio</option>
+        </select></Field>
+        <Field label={fulfillmentType === 'DELIVERY' ? 'Data di consegna' : 'Data di ritiro'}>
           <input type="date" value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} required />
         </Field>
+        {fulfillmentType === 'DELIVERY' && <>
+          <Field label="Indirizzo di consegna"><input maxLength={250} value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} required /></Field>
+          <div className="row wrap">
+            <Field label="Città"><input maxLength={120} value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} required /></Field>
+            <Field label="CAP"><input maxLength={20} value={deliveryPostalCode} onChange={(e) => setDeliveryPostalCode(e.target.value)} required /></Field>
+          </div>
+          <Field label="Telefono per la consegna"><input maxLength={30} value={deliveryPhone} onChange={(e) => setDeliveryPhone(e.target.value)} required /></Field>
+          <Field label="Istruzioni per il corriere"><textarea rows={2} maxLength={500} value={deliveryNotes} onChange={(e) => setDeliveryNotes(e.target.value)} /></Field>
+        </>}
 
         <div className="stack">
           {lines.map((l, i) => (

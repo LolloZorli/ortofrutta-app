@@ -1,6 +1,7 @@
 package it.tuonome.ortofrutta.report;
 
 import it.tuonome.ortofrutta.common.CurrentUser;
+import it.tuonome.ortofrutta.company.CompanyContext;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,21 +48,23 @@ public class ReportService {
                   coalesce(sum(case when type = 'SALE' then quantity * unit_cost end), 0) as cost30,
                   coalesce(sum(case when type = 'WASTE' then quantity * unit_cost end), 0) as waste30
                 from stock_movements
-                where not voided and created_at >= :since
-                """).param("today", startOfDay).param("since", since30)
+                where company_id = :companyId and not voided and created_at >= :since
+                """).param("companyId", CompanyContext.requireId()).param("today", startOfDay).param("since", since30)
                 .query((rs, n) -> new Totals(rs.getBigDecimal("today_revenue"), rs.getBigDecimal("revenue30"),
                         rs.getBigDecimal("cost30"), rs.getBigDecimal("waste30")))
                 .single();
 
         BigDecimal stockValue = jdbc.sql(
-                "select coalesce(sum(remaining_quantity * unit_cost), 0) from lots")
+                "select coalesce(sum(remaining_quantity * unit_cost), 0) from lots where company_id = :companyId")
+                .param("companyId", CompanyContext.requireId())
                 .query(BigDecimal.class).single();
 
         long[] counts = jdbc.sql("""
                 select
-                  (select count(*) from customer_orders where status in ('NEW', 'READY')) as reservations,
-                  (select count(*) from supplier_orders where status in ('DRAFT', 'SENT')) as orders
-                """).query((rs, n) -> new long[]{rs.getLong("reservations"), rs.getLong("orders")}).single();
+                  (select count(*) from customer_orders where company_id = :companyId and status in ('NEW', 'READY')) as reservations,
+                  (select count(*) from supplier_orders where company_id = :companyId and status in ('DRAFT', 'SENT')) as orders
+                """).param("companyId", CompanyContext.requireId())
+                .query((rs, n) -> new long[]{rs.getLong("reservations"), rs.getLong("orders")}).single();
 
         return new ReportDtos.Dashboard(t.todayRevenue(), stockValue, t.revenue30(),
                 t.revenue30().subtract(t.cost30()), t.waste30(), counts[0], counts[1],
@@ -74,18 +77,18 @@ public class ReportService {
                 select p.id, p.name, u.short_label, p.min_stock,
                        coalesce(sum(l.remaining_quantity), 0) as stock,
                        coalesce((select sum(sm.quantity) / 30.0 from stock_movements sm
-                         where sm.product_id=p.id and sm.type='SALE' and not sm.voided
+                         where sm.company_id = p.company_id and sm.product_id=p.id and sm.type='SALE' and not sm.voided
                          and sm.created_at >= now() - interval '30 days'), 0) as daily_sales,
-                       (select l2.unit_cost from lots l2 where l2.product_id = p.id
+                       (select l2.unit_cost from lots l2 where l2.company_id = p.company_id and l2.product_id = p.id
                          order by l2.received_at desc, l2.id desc limit 1) as last_cost
                 from products p
-                join units u on u.id = p.unit_id
-                left join lots l on l.product_id = p.id
-                where p.active and p.min_stock > 0
+                join units u on u.id = p.unit_id and u.company_id = p.company_id
+                left join lots l on l.product_id = p.id and l.company_id = p.company_id
+                where p.company_id = :companyId and p.active and p.min_stock > 0
                 group by p.id, p.name, u.short_label, p.min_stock
                 having coalesce(sum(l.remaining_quantity), 0) < p.min_stock
                 order by p.name
-                """).query((rs, n) -> {
+                """).param("companyId", CompanyContext.requireId()).query((rs, n) -> {
             BigDecimal min = rs.getBigDecimal("min_stock");
             BigDecimal stock = rs.getBigDecimal("stock");
             BigDecimal daily = rs.getBigDecimal("daily_sales");
@@ -103,11 +106,11 @@ public class ReportService {
         return jdbc.sql("""
                 select l.id, p.id as product_id, p.name, u.short_label, l.remaining_quantity, l.expires_at
                 from lots l
-                join products p on p.id = l.product_id
-                join units u on u.id = p.unit_id
-                where l.remaining_quantity > 0 and l.expires_at is not null and l.expires_at <= :limit
+                join products p on p.id = l.product_id and p.company_id = l.company_id
+                join units u on u.id = p.unit_id and u.company_id = p.company_id
+                where l.company_id = :companyId and l.remaining_quantity > 0 and l.expires_at is not null and l.expires_at <= :limit
                 order by l.expires_at, p.name
-                """).param("limit", Date.valueOf(limit)).query((rs, n) -> {
+                """).param("companyId", CompanyContext.requireId()).param("limit", Date.valueOf(limit)).query((rs, n) -> {
             LocalDate exp = rs.getDate("expires_at").toLocalDate();
             return new ReportDtos.ExpiringLot(rs.getLong("id"), rs.getLong("product_id"),
                     rs.getString("name"), rs.getString("short_label"),
@@ -121,13 +124,13 @@ public class ReportService {
                 select p.id, p.name, u.short_label,
                        sum(m.quantity) as quantity, sum(m.quantity * m.unit_price) as revenue
                 from stock_movements m
-                join products p on p.id = m.product_id
-                join units u on u.id = p.unit_id
-                where m.type = 'SALE' and not m.voided and m.created_at >= :from
+                join products p on p.id = m.product_id and p.company_id = m.company_id
+                join units u on u.id = p.unit_id and u.company_id = p.company_id
+                where m.company_id = :companyId and m.type = 'SALE' and not m.voided and m.created_at >= :from
                 group by p.id, p.name, u.short_label
                 order by revenue desc
                 limit 5
-                """).param("from", since).query((rs, n) ->
+                """).param("companyId", CompanyContext.requireId()).param("from", since).query((rs, n) ->
                 new ReportDtos.TopProduct(rs.getLong("id"), rs.getString("name"),
                         rs.getString("short_label"), rs.getBigDecimal("quantity"),
                         rs.getBigDecimal("revenue"))).list();
@@ -144,12 +147,13 @@ public class ReportService {
                   coalesce(sum(case when m.type = 'WASTE' then m.quantity end), 0) as waste_qty,
                   coalesce(sum(case when m.type = 'WASTE' then m.quantity * m.unit_cost end), 0) as waste_cost
                 from products p
-                join units u on u.id = p.unit_id
-                left join stock_movements m on m.product_id = p.id and not m.voided and m.created_at >= :from
+                join units u on u.id = p.unit_id and u.company_id = p.company_id
+                left join stock_movements m on m.product_id = p.id and m.company_id = p.company_id and not m.voided and m.created_at >= :from
+                where p.company_id = :companyId
                 group by p.id, p.name, u.short_label
                 having coalesce(sum(case when m.type in ('SALE', 'WASTE') then m.quantity end), 0) > 0
                 order by revenue desc, p.name
-                """).param("from", daysAgo(d)).query((rs, n) -> {
+                """).param("companyId", CompanyContext.requireId()).param("from", daysAgo(d)).query((rs, n) -> {
             BigDecimal sold = rs.getBigDecimal("sold_qty");
             BigDecimal revenue = rs.getBigDecimal("revenue");
             BigDecimal cost = rs.getBigDecimal("cost");
@@ -170,10 +174,10 @@ public class ReportService {
         List<ReportDtos.VatRow> byVat = jdbc.sql("""
                 select coalesce(m.vat_rate, 0) as rate, sum(m.quantity * m.unit_price) as gross
                 from stock_movements m
-                where m.type = 'SALE' and not m.voided and m.created_at >= :from and m.created_at < :to
+                where m.company_id = :companyId and m.type = 'SALE' and not m.voided and m.created_at >= :from and m.created_at < :to
                 group by coalesce(m.vat_rate, 0)
                 order by 1
-                """).param("from", from).param("to", to).query((rs, n) -> {
+                """).param("companyId", CompanyContext.requireId()).param("from", from).param("to", to).query((rs, n) -> {
             BigDecimal rate = rs.getBigDecimal("rate");
             BigDecimal gross = rs.getBigDecimal("gross").setScale(2, RoundingMode.HALF_UP);
             BigDecimal net = gross.divide(BigDecimal.ONE.add(rate.movePointLeft(2)), 2, RoundingMode.HALF_UP);
@@ -185,25 +189,25 @@ public class ReportService {
                        sum(m.quantity * m.unit_price) as gross,
                        count(distinct m.sale_id) as sales
                 from stock_movements m
-                left join sales s on s.id = m.sale_id
-                left join payment_methods pm on pm.id = s.payment_method_id
-                where m.type = 'SALE' and not m.voided and m.created_at >= :from and m.created_at < :to
+                left join sales s on s.id = m.sale_id and s.company_id = m.company_id
+                left join payment_methods pm on pm.id = s.payment_method_id and pm.company_id = s.company_id
+                where m.company_id = :companyId and m.type = 'SALE' and not m.voided and m.created_at >= :from and m.created_at < :to
                 group by coalesce(pm.name, 'Non specificato')
                 order by gross desc
-                """).param("from", from).param("to", to).query((rs, n) ->
+                """).param("companyId", CompanyContext.requireId()).param("from", from).param("to", to).query((rs, n) ->
                 new ReportDtos.PaymentRow(rs.getString("method"),
                         rs.getBigDecimal("gross").setScale(2, RoundingMode.HALF_UP), rs.getLong("sales"))).list();
 
         long[] salesCounts = jdbc.sql("""
                 select count(*) filter (where status = 'COMPLETED') as done,
                        count(*) filter (where status = 'VOIDED') as voided
-                from sales where created_at >= :from and created_at < :to
-                """).param("from", from).param("to", to)
+                from sales where company_id = :companyId and created_at >= :from and created_at < :to
+                """).param("companyId", CompanyContext.requireId()).param("from", from).param("to", to)
                 .query((rs, n) -> new long[]{rs.getLong("done"), rs.getLong("voided")}).single();
         BigDecimal voidedTotal = jdbc.sql("""
                 select coalesce(sum(total), 0) from sales
-                where status = 'VOIDED' and created_at >= :from and created_at < :to
-                """).param("from", from).param("to", to).query(BigDecimal.class).single();
+                where company_id = :companyId and status = 'VOIDED' and created_at >= :from and created_at < :to
+                """).param("companyId", CompanyContext.requireId()).param("from", from).param("to", to).query(BigDecimal.class).single();
 
         BigDecimal gross = byVat.stream().map(ReportDtos.VatRow::gross).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal net = byVat.stream().map(ReportDtos.VatRow::net).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -212,8 +216,8 @@ public class ReportService {
     }
 
     public ReportDtos.CashClosing cashClosing(LocalDate date) {
-        return jdbc.sql("select expected_cash, counted_cash, note, closed_by, closed_at from cash_closings where closing_date=:date")
-                .param("date", date).query((rs, n) -> closing(rs.getBigDecimal("expected_cash"),
+        return jdbc.sql("select expected_cash, counted_cash, note, closed_by, closed_at from cash_closings where company_id=:companyId and closing_date=:date")
+                .param("companyId", CompanyContext.requireId()).param("date", date).query((rs, n) -> closing(rs.getBigDecimal("expected_cash"),
                         rs.getBigDecimal("counted_cash"), rs.getString("note"), rs.getString("closed_by"),
                         rs.getTimestamp("closed_at").toInstant())).optional().orElse(null);
     }
@@ -222,16 +226,17 @@ public class ReportService {
     public ReportDtos.CashClosing saveCashClosing(LocalDate date, ReportDtos.CashClosingRequest request) {
         BigDecimal expected = jdbc.sql("""
                 select coalesce(sum(s.total),0) from sales s join payment_methods pm on pm.id=s.payment_method_id
-                where s.status='COMPLETED' and s.created_at >= :from and s.created_at < :to and pm.code='CASH'
+                where s.company_id = :companyId and pm.company_id = s.company_id and s.status='COMPLETED' and s.created_at >= :from and s.created_at < :to and pm.code='CASH'
                 """).param("from", Timestamp.from(date.atStartOfDay(ZONE).toInstant()))
+                .param("companyId", CompanyContext.requireId())
                 .param("to", Timestamp.from(date.plusDays(1).atStartOfDay(ZONE).toInstant()))
                 .query(BigDecimal.class).single();
         jdbc.sql("""
-                insert into cash_closings(closing_date,expected_cash,counted_cash,note,closed_by)
-                values(:date,:expected,:counted,:note,:user)
-                on conflict(closing_date) do update set expected_cash=excluded.expected_cash,
+                insert into cash_closings(company_id,closing_date,expected_cash,counted_cash,note,closed_by)
+                values(:companyId,:date,:expected,:counted,:note,:user)
+                on conflict(company_id,closing_date) do update set expected_cash=excluded.expected_cash,
                 counted_cash=excluded.counted_cash,note=excluded.note,closed_by=excluded.closed_by,closed_at=now()
-                """).param("date", date).param("expected", expected).param("counted", request.countedCash())
+                """).param("companyId", CompanyContext.requireId()).param("date", date).param("expected", expected).param("counted", request.countedCash())
                 .param("note", request.note()).param("user", CurrentUser.name()).update();
         return cashClosing(date);
     }

@@ -16,6 +16,9 @@ public class AppUser {
     @Column(length = 254)
     private String email;
 
+    @Column(name = "display_name", length = 120)
+    private String displayName;
+
     private Long customerId;
 
     @Column(nullable = false, length = 100)
@@ -54,10 +57,15 @@ public class AppUser {
 
     public void setRole(AppRole role) { this.role = role; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public void setCustomerId(Long customerId) { this.customerId = customerId; }
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName == null || displayName.isBlank() ? null : displayName.trim();
+    }
 
     public Long getId() { return id; }
     public String getUsername() { return username; }
     public String getEmail() { return email; }
+    public String getDisplayName() { return displayName; }
     public Long getCustomerId() { return customerId; }
     public String getPasswordHash() { return passwordHash; }
     public AppRole getRole() { return role; }

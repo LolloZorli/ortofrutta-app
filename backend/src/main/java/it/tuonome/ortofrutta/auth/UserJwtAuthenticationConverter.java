@@ -7,6 +7,9 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import it.tuonome.ortofrutta.company.CompanyContext;
+import it.tuonome.ortofrutta.company.CompanyMembership;
+import it.tuonome.ortofrutta.company.CompanyMembershipRepository;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -24,22 +27,24 @@ public class UserJwtAuthenticationConverter implements Converter<Jwt, AbstractAu
 
     public static final String ACCESS = "ACCESS";
 
-    private final UserRepository users;
+    private final CompanyMembershipRepository memberships;
 
-    public UserJwtAuthenticationConverter(UserRepository users) {
-        this.users = users;
+    public UserJwtAuthenticationConverter(CompanyMembershipRepository memberships) {
+        this.memberships = memberships;
     }
 
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
-        AppUser user = users.findWithRoleByUsername(jwt.getSubject())
-                .filter(AppUser::isEnabled)
+        CompanyMembership membership = memberships.findActiveByCompanyAndUsername(
+                        CompanyContext.requireId(), jwt.getSubject())
                 .orElseThrow(() -> new BadCredentialsException("Utente non valido o disattivato"));
+        AppUser user = membership.getUser();
+        if (!user.isEnabled()) throw new BadCredentialsException("Utente non valido o disattivato");
 
         List<GrantedAuthority> authorities = new ArrayList<>();
         if (!user.isMustChangePassword()) {
             authorities.add(new SimpleGrantedAuthority(ACCESS));
-            for (Permission p : user.getRole().effectivePermissions()) {
+            for (Permission p : membership.getRole().effectivePermissions()) {
                 authorities.add(new SimpleGrantedAuthority(p.name()));
             }
         }

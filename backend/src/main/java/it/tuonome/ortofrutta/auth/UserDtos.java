@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Email;
+import it.tuonome.ortofrutta.company.CompanyMembership;
 
 public final class UserDtos {
 
@@ -32,9 +33,10 @@ public final class UserDtos {
 
     public record Response(Long id, String username, String email, Long roleId, String roleName,
                            boolean enabled, boolean mustChangePassword) {
-        static Response from(AppUser u) {
-            return new Response(u.getId(), u.getUsername(), u.getEmail(), u.getRole().getId(), u.getRole().getName(),
-                    u.isEnabled(), u.isMustChangePassword());
+        static Response from(CompanyMembership membership) {
+            AppUser u = membership.getUser();
+            return new Response(u.getId(), u.getUsername(), u.getEmail(), membership.getRole().getId(),
+                    membership.getRole().getName(), membership.isEnabled() && u.isEnabled(), u.isMustChangePassword());
         }
     }
 }

@@ -1,6 +1,8 @@
 package it.tuonome.ortofrutta.auth;
 
+import it.tuonome.ortofrutta.company.CompanyScopedEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -8,7 +10,8 @@ import java.util.Set;
 
 @Entity
 @Table(name = "roles")
-public class AppRole {
+@SQLRestriction(CompanyScopedEntity.RESTRICTION)
+public class AppRole extends CompanyScopedEntity {
 
     public static final String ADMIN_CODE = "ADMIN";
     public static final String CUSTOMER_CODE = "CUSTOMER";
@@ -17,7 +20,7 @@ public class AppRole {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 40)
+    @Column(nullable = false, length = 40)
     private String code;
 
     @Column(nullable = false, length = 80)

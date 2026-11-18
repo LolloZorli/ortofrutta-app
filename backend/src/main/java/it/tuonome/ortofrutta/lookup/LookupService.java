@@ -1,6 +1,7 @@
 package it.tuonome.ortofrutta.lookup;
 
 import it.tuonome.ortofrutta.audit.AuditService;
+import it.tuonome.ortofrutta.company.CompanyContext;
 import it.tuonome.ortofrutta.common.BusinessException;
 import it.tuonome.ortofrutta.common.NotFoundException;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -19,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Accesso alle tipologiche, con una cache in memoria: sono poche, cambiano raramente e vengono
@@ -40,7 +42,7 @@ public class LookupService {
 
     private final JdbcClient jdbc;
     private final AuditService audit;
-    private volatile Snapshot snapshot;
+    private final Map<Long, Snapshot> snapshots = new ConcurrentHashMap<>();
 
     public LookupService(JdbcClient jdbc, AuditService audit) {
         this.jdbc = jdbc;
@@ -114,8 +116,9 @@ public class LookupService {
         p.put("name", name);
         p.put("sort", r.sortOrder() != null ? r.sortOrder() : nextSort(type));
         p.put("active", r.active() == null || r.active());
-        StringBuilder cols = new StringBuilder("code, name, sort_order, active");
-        StringBuilder vals = new StringBuilder(":code, :name, :sort, :active");
+        p.put("companyId", CompanyContext.requireId());
+        StringBuilder cols = new StringBuilder("company_id, code, name, sort_order, active");
+        StringBuilder vals = new StringBuilder(":companyId, :code, :name, :sort, :active");
         if (type.hasUnitAttributes()) {
             cols.append(", short_label, allow_decimals");
             vals.append(", :short, :dec");
@@ -148,6 +151,7 @@ public class LookupService {
 
         Map<String, Object> p = new HashMap<>();
         p.put("id", id);
+        p.put("companyId", CompanyContext.requireId());
         p.put("name", name);
         p.put("sort", r.sortOrder() != null ? r.sortOrder() : cur.sortOrder());
         p.put("active", r.active() != null ? r.active() : cur.active());
@@ -164,7 +168,7 @@ public class LookupService {
             set.append(", rate = :rate");
             p.put("rate", rate);
         }
-        jdbc.sql("update " + type.table() + " set " + set + " where id = :id").params(p).update();
+        jdbc.sql("update " + type.table() + " set " + set + " where id = :id and company_id = :companyId").params(p).update();
 
         reload();
         audit.record("LOOKUP_UPDATE", type.name(), id,
@@ -175,7 +179,8 @@ public class LookupService {
     // ---------------------------------- interni ----------------------------------
 
     private Snapshot current() {
-        Snapshot s = snapshot;
+        Long companyId = CompanyContext.requireId();
+        Snapshot s = snapshots.get(companyId);
         if (s == null || Duration.between(s.loadedAt(), Instant.now()).compareTo(TTL) > 0) {
             return reload();
         }
@@ -183,17 +188,20 @@ public class LookupService {
     }
 
     private synchronized Snapshot reload() {
+        long companyId = CompanyContext.requireId();
         Map<LookupType, Map<Long, LookupItem>> data = new EnumMap<>(LookupType.class);
         for (LookupType t : LookupType.values()) {
             Map<Long, LookupItem> m = new LinkedHashMap<>();
-            jdbc.sql("select " + columns(t) + " from " + t.table() + " order by sort_order, name")
+            jdbc.sql("select " + columns(t) + " from " + t.table()
+                            + " where company_id = :companyId order by sort_order, name")
+                    .param("companyId", companyId)
                     .query((rs, n) -> map(t, rs))
                     .list()
                     .forEach(i -> m.put(i.id(), i));
             data.put(t, m);
         }
         Snapshot s = new Snapshot(Instant.now(), data);
-        snapshot = s;
+        snapshots.put(companyId, s);
         return s;
     }
 
@@ -226,9 +234,9 @@ public class LookupService {
     }
 
     private boolean nameExists(LookupType type, String name, Long excludeId) {
-        String sql = "select count(*) from " + type.table() + " where lower(name) = lower(:name)"
+        String sql = "select count(*) from " + type.table() + " where company_id = :companyId and lower(name) = lower(:name)"
                 + (excludeId != null ? " and id <> :id" : "");
-        JdbcClient.StatementSpec spec = jdbc.sql(sql).param("name", name);
+        JdbcClient.StatementSpec spec = jdbc.sql(sql).param("companyId", CompanyContext.requireId()).param("name", name);
         if (excludeId != null) {
             spec = spec.param("id", excludeId);
         }
@@ -239,15 +247,16 @@ public class LookupService {
         String base = slug(name);
         String code = base;
         int n = 2;
-        while (jdbc.sql("select count(*) from " + type.table() + " where code = :code")
-                .param("code", code).query(Long.class).single() > 0) {
+        while (jdbc.sql("select count(*) from " + type.table() + " where company_id = :companyId and code = :code")
+                .param("companyId", CompanyContext.requireId()).param("code", code).query(Long.class).single() > 0) {
             code = base + "_" + n++;
         }
         return code;
     }
 
     private int nextSort(LookupType type) {
-        Integer max = jdbc.sql("select coalesce(max(sort_order), 0) from " + type.table())
+        Integer max = jdbc.sql("select coalesce(max(sort_order), 0) from " + type.table() + " where company_id = :companyId")
+                .param("companyId", CompanyContext.requireId())
                 .query(Integer.class).single();
         return max + 1;
     }

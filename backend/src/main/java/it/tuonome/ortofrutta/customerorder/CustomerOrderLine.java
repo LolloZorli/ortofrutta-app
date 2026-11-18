@@ -1,13 +1,16 @@
 package it.tuonome.ortofrutta.customerorder;
 
+import it.tuonome.ortofrutta.company.CompanyScopedEntity;
 import it.tuonome.ortofrutta.product.Product;
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 
 @Entity
 @Table(name = "customer_order_lines")
-public class CustomerOrderLine {
+@SQLRestriction(CompanyScopedEntity.RESTRICTION)
+public class CustomerOrderLine extends CompanyScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

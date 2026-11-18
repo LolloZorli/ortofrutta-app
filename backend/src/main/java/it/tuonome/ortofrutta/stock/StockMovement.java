@@ -1,7 +1,9 @@
 package it.tuonome.ortofrutta.stock;
 
+import it.tuonome.ortofrutta.company.CompanyScopedEntity;
 import it.tuonome.ortofrutta.product.Product;
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -9,7 +11,8 @@ import java.time.Instant;
 /** Storico: ogni carico, vendita o scarto. Una vendita su più lotti genera più movimenti. */
 @Entity
 @Table(name = "stock_movements")
-public class StockMovement {
+@SQLRestriction(CompanyScopedEntity.RESTRICTION)
+public class StockMovement extends CompanyScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

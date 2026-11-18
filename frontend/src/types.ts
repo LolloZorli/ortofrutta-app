@@ -1,6 +1,7 @@
 // ---------- utenti, ruoli, permessi ----------
 export interface Profile {
   username: string
+  displayName: string | null
   email: string | null
   roleCode: string
   roleName: string
@@ -19,11 +20,14 @@ export interface UserAccount {
 }
 
 export interface CatalogItem { id: number; name: string; category: string; unit: string; salePrice: number }
+export interface CompanyShop { id: number; name: string; slug: string }
 
 export interface CustomerOrderLine { id: number; productId: number; productName: string; unit: string; quantity: number; unitPrice: number }
 export interface CustomerOrder {
   id: number; customerId: number; customerName: string; customerPhone: string | null
-  status: 'NEW' | 'READY' | 'PICKED_UP' | 'CANCELLED'; pickupDate: string; notes: string | null
+  status: 'NEW' | 'READY' | 'PICKED_UP' | 'DELIVERED' | 'CANCELLED'; pickupDate: string; notes: string | null
+  fulfillmentType: 'PICKUP' | 'DELIVERY'; deliveryAddress: string | null; deliveryCity: string | null
+  deliveryPostalCode: string | null; deliveryPhone: string | null; deliveryNotes: string | null
   createdAt: string; lines: CustomerOrderLine[]; total: number
 }
 
@@ -188,7 +192,7 @@ export interface SupplierOrder {
 }
 
 // ---------- prenotazioni ----------
-export type ReservationStatus = 'NEW' | 'READY' | 'PICKED_UP' | 'CANCELLED'
+export type ReservationStatus = 'NEW' | 'READY' | 'PICKED_UP' | 'DELIVERED' | 'CANCELLED'
 
 export interface ReservationLine {
   id: number
@@ -206,6 +210,12 @@ export interface Reservation {
   customerPhone: string | null
   status: ReservationStatus
   pickupDate: string
+  fulfillmentType: 'PICKUP' | 'DELIVERY'
+  deliveryAddress: string | null
+  deliveryCity: string | null
+  deliveryPostalCode: string | null
+  deliveryPhone: string | null
+  deliveryNotes: string | null
   notes: string | null
   createdAt: string
   lines: ReservationLine[]

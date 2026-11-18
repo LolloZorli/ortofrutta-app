@@ -1,8 +1,10 @@
 package it.tuonome.ortofrutta.supplierorder;
 
+import it.tuonome.ortofrutta.company.CompanyScopedEntity;
 import it.tuonome.ortofrutta.product.Product;
 import it.tuonome.ortofrutta.supplier.Supplier;
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -11,7 +13,8 @@ import java.util.List;
 
 @Entity
 @Table(name = "supplier_orders")
-public class SupplierOrder {
+@SQLRestriction(CompanyScopedEntity.RESTRICTION)
+public class SupplierOrder extends CompanyScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -1,8 +1,10 @@
 package it.tuonome.ortofrutta.stock;
 
+import it.tuonome.ortofrutta.company.CompanyScopedEntity;
 import it.tuonome.ortofrutta.product.Product;
 import it.tuonome.ortofrutta.supplier.Supplier;
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -11,7 +13,8 @@ import java.time.LocalDate;
 /** Una partita di merce arrivata: ha un costo, una data di arrivo e (facoltativa) di scadenza. */
 @Entity
 @Table(name = "lots")
-public class Lot {
+@SQLRestriction(CompanyScopedEntity.RESTRICTION)
+public class Lot extends CompanyScopedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

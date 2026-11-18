@@ -28,12 +28,27 @@ public final class CustomerOrderDtos {
             @NotNull Long customerId,
             @NotNull LocalDate pickupDate,
             @Size(max = 500) String notes,
-            @NotEmpty @Valid List<LineRequest> lines
+            @NotEmpty @Valid List<LineRequest> lines,
+            FulfillmentType fulfillmentType,
+            @Size(max = 250) String deliveryAddress,
+            @Size(max = 120) String deliveryCity,
+            @Size(max = 20) String deliveryPostalCode,
+            @Size(max = 30) String deliveryPhone,
+            @Size(max = 500) String deliveryNotes
     ) {
+        public Request(Long customerId, LocalDate pickupDate, String notes, List<LineRequest> lines) {
+            this(customerId, pickupDate, notes, lines, FulfillmentType.PICKUP, null, null, null, null, null);
+        }
     }
 
     public record CustomerRequest(@NotNull LocalDate pickupDate, @Size(max = 500) String notes,
-                                  @NotEmpty @Valid List<CustomerLineRequest> lines) { }
+                                  @NotEmpty @Valid List<CustomerLineRequest> lines,
+                                  FulfillmentType fulfillmentType,
+                                  @Size(max = 250) String deliveryAddress,
+                                  @Size(max = 120) String deliveryCity,
+                                  @Size(max = 20) String deliveryPostalCode,
+                                  @Size(max = 30) String deliveryPhone,
+                                  @Size(max = 500) String deliveryNotes) { }
 
     public record CustomerLineRequest(@NotNull Long productId,
                                       @NotNull @DecimalMin("0.001") BigDecimal quantity) { }
@@ -51,7 +66,9 @@ public final class CustomerOrderDtos {
     public record Response(
             Long id, Long customerId, String customerName, String customerPhone,
             CustomerOrderStatus status, LocalDate pickupDate, String notes, Instant createdAt,
-            List<LineResponse> lines, BigDecimal total
+            List<LineResponse> lines, BigDecimal total, FulfillmentType fulfillmentType,
+            String deliveryAddress, String deliveryCity, String deliveryPostalCode,
+            String deliveryPhone, String deliveryNotes
     ) {
         static Response from(CustomerOrder o, LookupService lookups) {
             List<LineResponse> lines = o.getLines().stream()
@@ -63,7 +80,8 @@ public final class CustomerOrderDtos {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             return new Response(o.getId(), o.getCustomer().getId(), o.getCustomer().getName(),
                     o.getCustomer().getPhone(), o.getStatus(), o.getPickupDate(), o.getNotes(),
-                    o.getCreatedAt(), lines, total);
+                    o.getCreatedAt(), lines, total, o.getFulfillmentType(), o.getDeliveryAddress(),
+                    o.getDeliveryCity(), o.getDeliveryPostalCode(), o.getDeliveryPhone(), o.getDeliveryNotes());
         }
     }
 }
