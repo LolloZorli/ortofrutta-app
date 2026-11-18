@@ -70,26 +70,3 @@ jobs:
           tags: |
             ghcr.io/lollozorli/ortofrutta-app-frontend:${{ github.sha }}
             ghcr.io/lollozorli/ortofrutta-app-frontend:latest
-
-  deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.DEPLOY_KUBERNETES == 'true'
-    needs: publish
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-kubectl@v4
-      - name: Configure Kubernetes access
-        env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-        run: |
-          mkdir -p "$HOME/.kube"
-          printf '%s' "$KUBE_CONFIG" > "$HOME/.kube/config"
-          chmod 600 "$HOME/.kube/config"
-      - name: Apply Kubernetes resources
-        run: kubectl apply -f k8s/app.yaml
-      - name: Deploy published images
-        run: |
-          kubectl -n ortofrutta set image deployment/ortofrutta-backend backend=ghcr.io/lollozorli/ortofrutta-app-backend:${GITHUB_SHA}
-          kubectl -n ortofrutta set image deployment/ortofrutta-frontend frontend=ghcr.io/lollozorli/ortofrutta-app-frontend:${GITHUB_SHA}
-          kubectl -n ortofrutta rollout status deployment/ortofrutta-backend --timeout=5m
-          kubectl -n ortofrutta rollout status deployment/ortofrutta-frontend --timeout=5m
