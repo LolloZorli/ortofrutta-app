@@ -143,8 +143,8 @@ docker compose --profile app pull              # scarica le immagini pubblicate 
 docker compose --profile app up -d             # app su http://localhost:3000, API su :8081
 ```
 
-PostgreSQL è raggiungibile dal PC su `localhost:5433`; i container si collegano invece al servizio
-`db:5432` sulla rete Docker. La porta host `5433` non va usata nell'URL JDBC del backend.
+PostgreSQL è raggiungibile dal PC su `localhost:5432`; anche i container si collegano alla porta `5432`,
+usando il nome del servizio Docker `db`.
 Le richieste del frontend passano da nginx (`/api`) e restano sullo stesso origin: nginx non inoltra
 l'header `Origin` al backend. `APP_CORS_ALLOWED_ORIGINS` in Compose autorizza comunque `http://localhost:3000`
 se si interroga direttamente l'API dalla porta `8081`.
@@ -248,7 +248,7 @@ I test di integrazione condividono **un solo PostgreSQL** (Testcontainers) e un 
 | `JWT_SECRET` | Chiave di firma dei token, min. 32 caratteri | valore fisso di sviluppo |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Amministratore creato al primo avvio | `admin` / `admin123` |
 | `ADMIN_MUST_CHANGE_PASSWORD` | Obbliga a cambiare la password al primo accesso | `true` |
-| `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` | Database | `localhost:5433/ortofrutta` dal PC; `db:5432/ortofrutta` nei container |
+| `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` | Database | `localhost:5432/ortofrutta` dal PC; `db:5432/ortofrutta` nei container |
 | `X-Company-Slug` | Azienda selezionata per le API | `ortofrutta` |
 | `SPRING_PROFILES_ACTIVE=demo` | Carica dati di prova | disattivo |
 
