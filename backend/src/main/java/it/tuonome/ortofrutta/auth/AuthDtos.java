@@ -45,4 +45,13 @@ public final class AuthDtos {
             @NotBlank @Size(min = 8, max = 72, message = "La password deve avere da 8 a 72 caratteri") String newPassword
     ) {
     }
+
+    public record ForgotPasswordRequest(@NotBlank @Email @Size(max = 254) String email) {
+    }
+
+    public record ResetPasswordRequest(
+            @NotBlank String token,
+            @NotBlank @Size(min = 8, max = 72, message = "La password deve avere da 8 a 72 caratteri") String newPassword
+    ) {
+    }
 }

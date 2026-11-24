@@ -1,0 +1,23 @@
+namespace: ortofrutta
+
+database:
+  storage: 5Gi
+  image: postgres:16
+
+backend:
+  image: ghcr.io/lollozorli/ortofrutta-app-backend
+  tag: latest
+  replicas: 1
+  servicePort: 8080
+
+frontend:
+  image: ghcr.io/lollozorli/ortofrutta-app-frontend
+  tag: latest
+  replicas: 1
+  servicePort: 80
+
+imagePullSecret: ghcr-pull-secret
+existingSecret: ortofrutta-config
+
+monitoring:
+  enabled: false

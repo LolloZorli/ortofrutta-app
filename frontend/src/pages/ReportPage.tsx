@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { api } from '../api'
+import { api, errorMessage } from '../api'
 import { Chip, Empty, ErrorBox, Loading, Stat } from '../components/ui'
 import { eur, num, qty } from '../format'
 import { useLoad } from '../hooks'
 import type { ProductReport } from '../types'
+import { useToast } from '../toast'
 
 const RANGES = [
   { days: 7, label: '7 giorni' },
@@ -13,6 +14,7 @@ const RANGES = [
 
 export default function ReportPage() {
   const [days, setDays] = useState(30)
+  const toast = useToast()
   const { data, loading, error, reload } = useLoad<ProductReport[]>(() => api.get(`/reports/products?days=${days}`), [days])
 
   const totals = (data ?? []).reduce(
@@ -32,6 +34,15 @@ export default function ReportPage() {
             {r.label}
           </button>
         ))}
+        <button onClick={async () => {
+          try {
+            await api.download(`/reports/products/export?days=${days}`, `report-prodotti-${days}-giorni.csv`)
+            toast.ok('CSV esportato')
+          } catch (e) {
+            toast.error(errorMessage(e))
+          }
+        }}>Esporta CSV</button>
+        <button onClick={() => window.print()}>Stampa</button>
       </div>
 
       {loading && !data ? (

@@ -45,4 +45,16 @@ public class AuthController {
                                @Valid @RequestBody AuthDtos.ChangePasswordRequest request) {
         service.changePassword(jwt.getSubject(), request);
     }
+
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void forgotPassword(@Valid @RequestBody AuthDtos.ForgotPasswordRequest request) {
+        service.requestPasswordReset(request);
+    }
+
+    @PostMapping("/reset-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetPassword(@Valid @RequestBody AuthDtos.ResetPasswordRequest request) {
+        service.resetPassword(request);
+    }
 }

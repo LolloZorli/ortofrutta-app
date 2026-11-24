@@ -57,6 +57,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/register-employee",
+                                "/api/auth/forgot-password", "/api/auth/reset-password",
                                 "/actuator/health", "/actuator/health/**",
                                 "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/companies").permitAll()
@@ -115,7 +116,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/customer-orders/**").hasAuthority("RESERVATIONS_MANAGE")
 
                         // report; la dashboard è disponibile agli operatori, non agli account cliente
-                        .requestMatchers("/api/reports/products", "/api/reports/corrispettivi", "/api/reports/cash-closing")
+                        .requestMatchers("/api/reports/products", "/api/reports/products/export",
+                                "/api/reports/corrispettivi", "/api/reports/cash-closing")
                                 .hasAuthority("REPORTS_VIEW")
                         .requestMatchers(HttpMethod.GET, "/api/reports/dashboard")
                                 .hasAnyAuthority("STOCK_READ", "SALES_CREATE", "REPORTS_VIEW", "SUPPLIER_ORDERS_MANAGE")

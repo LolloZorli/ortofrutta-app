@@ -95,6 +95,25 @@ export const api = {
   post: <T,>(path: string, body?: unknown) => request<T>('POST', path, body ?? {}),
   put: <T,>(path: string, body: unknown) => request<T>('PUT', path, body),
   del: (path: string) => request<void>('DELETE', path),
+  download: async (path: string, filename: string) => {
+    const headers: Record<string, string> = {}
+    const token = session.token()
+    if (token) headers.Authorization = `Bearer ${token}`
+    headers['X-Company-Slug'] = companySession.slug()
+    const res = await fetch(`${API_BASE_URL}/api${path}`, { headers })
+    if (!res.ok) throw new ApiError(res.status, res.status === 403
+      ? 'Non hai i permessi per questa operazione'
+      : `Errore ${res.status}`)
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  },
 }
 
 export function errorMessage(e: unknown): string {

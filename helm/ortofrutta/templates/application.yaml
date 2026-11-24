@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ortofrutta-backend
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ortofrutta-backend
+  template:
+    metadata:
+      labels:
+        app: ortofrutta-backend
+      annotations:
+        prometheus.io/scrape: "{{ .Values.monitoring.enabled }}"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8080"
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image }}:{{ .Values.backend.tag }}"
+          envFrom:
+            - secretRef:
+                name: {{ .Values.existingSecret }}
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://db:5432/ortofrutta
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: http }
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: http }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: ortofrutta-backend
+  ports:
+    - port: {{ .Values.backend.servicePort }}
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ortofrutta-frontend
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels:
+      app: ortofrutta-frontend
+  template:
+    metadata:
+      labels:
+        app: ortofrutta-frontend
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontend.image }}:{{ .Values.frontend.tag }}"
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /, port: http }
+          livenessProbe:
+            httpGet: { path: /, port: http }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ortofrutta-frontend
+  namespace: {{ .Values.namespace }}
+spec:
+  type: LoadBalancer
+  selector:
+    app: ortofrutta-frontend
+  ports:
+    - port: {{ .Values.frontend.servicePort }}
+      targetPort: http

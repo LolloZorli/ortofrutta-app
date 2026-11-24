@@ -192,9 +192,13 @@ Il namespace, PVC, Deployment e Service sono definiti in `k8s/app.yaml`. Le imma
 pubblicate su GHCR e poi impostate sui Deployment usando il tag immutabile del commit; il workflow
 attende la fine dei rolling update.
 
-Le migrazioni **V3–V7** aggiungono tipologiche e funzionalità senza cancellare i dati esistenti; V4 aggiunge
-il codice a barre, V5 aggiunge collegamento vendite-clienti, chiusura contanti e rettifiche inventario,
-V6 aggiunge account email collegati ai clienti e V7 aggiorna la descrizione del ruolo Responsabile.
+Le migrazioni **V3–V7** aggiungono tipologiche e funzionalità senza cancellare i dati esistenti: V4 aggiunge
+il codice a barre, V5 collega le vendite ai clienti, introduce la chiusura contanti e le rettifiche inventario,
+V6 aggiunge gli account email dei clienti e V7 aggiorna la descrizione del ruolo Responsabile.
+**V8** introduce il modello multi-azienda e assegna i dati esistenti allo shop `ortofrutta`; **V9** aggiunge
+ritiro/consegna agli ordini clienti; **V10** aggiunge l'approvazione delle richieste staff e i permessi
+aggiuntivi di responsabile e commesso; **V11** aggiunge gli indici per il catalogo clienti e la disponibilità.
+**V12** aggiunge i token monouso per il reset password.
 Prima di aggiornare un database già usato, fai un backup. Flyway applica le migrazioni all'avvio del backend.
 Verifica le aliquote IVA prima di usare dati reali.
 
@@ -226,6 +230,18 @@ cd backend && mvn verify             # serve Docker acceso (Testcontainers)
 cd frontend && npm run build         # controllo dei tipi + build
 ```
 
+Su Windows è necessario avere JDK 21 e Maven nel `PATH`, oppure usare il Maven integrato in IntelliJ.
+Prima di eseguire i test Docker, avvia Docker Desktop e verifica con `docker info`.
+In questa configurazione i test backend che richiedono PostgreSQL usano Testcontainers; quindi non bastano
+solo JDK e Maven.
+
+Per eseguire rapidamente i due test backend indipendenti da Docker:
+
+```bash
+cd backend
+mvn -Dtest=StockServiceTest,LookupSlugTest test
+```
+
 Se Testcontainers segnala che l'API Docker `1.32` è troppo vecchia, imposta
 `JAVA_TOOL_OPTIONS=-Dapi.version=1.44` prima di eseguire Maven. La CI backend usa già questo override.
 
@@ -251,6 +267,34 @@ I test di integrazione condividono **un solo PostgreSQL** (Testcontainers) e un 
 | `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` | Database | `localhost:5433/ortofrutta` dal PC; `db:5432/ortofrutta` nei container |
 | `X-Company-Slug` | Azienda selezionata per le API | `ortofrutta` |
 | `SPRING_PROFILES_ACTIVE=demo` | Carica dati di prova | disattivo |
+
+## Funzioni di produzione
+
+- Dalla pagina **Report** è possibile esportare i dati prodotti in CSV e stampare il prospetto.
+- La schermata di accesso supporta la richiesta di reset password. Il token è casuale, salvato solo come hash,
+  ha durata configurabile e viene invalidato dopo l'uso o una nuova richiesta.
+- Gli avvisi automatici possono segnalare via email prodotti sotto scorta e lotti in scadenza.
+- Il backend espone `/actuator/prometheus` per Prometheus e contiene annotazioni Helm per lo scraping.
+
+| Variabile notifiche/reset | Significato |
+|---|---|
+| `SPRING_MAIL_HOST/PORT/USERNAME/PASSWORD` | Server SMTP per reset password e avvisi |
+| `SPRING_MAIL_AUTH/STARTTLS` | Configurazione autenticazione SMTP |
+| `PASSWORD_RESET_BASE_URL` | URL pubblico del frontend da inserire nel link di reset |
+| `PASSWORD_RESET_TOKEN_TTL` | Durata del token reset, default `30m` |
+| `NOTIFICATION_RECIPIENT_EMAILS` | Elenco email separate da virgola |
+| `NOTIFICATION_CRON` | Programmazione avvisi, default 08:00 Europe/Rome |
+
+Il deploy Kubernetes può usare anche il chart in `helm/ortofrutta`:
+
+```bash
+helm lint helm/ortofrutta
+helm upgrade --install ortofrutta helm/ortofrutta \
+  --namespace ortofrutta --create-namespace \
+  --set backend.tag=<commit-sha> --set frontend.tag=<commit-sha>
+```
+
+La CI esegue Gitleaks, Trivy, lint Helm e la build backend/frontend prima della pubblicazione delle immagini.
 
 ## Limiti noti
 

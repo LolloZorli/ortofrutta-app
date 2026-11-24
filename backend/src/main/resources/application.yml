@@ -1,6 +1,14 @@
 spring:
   application:
     name: ortofrutta
+  mail:
+    host: ${SPRING_MAIL_HOST:}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SPRING_MAIL_AUTH:true}
+      mail.smtp.starttls.enable: ${SPRING_MAIL_STARTTLS:true}
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:ortofrutta}
     username: ${DB_USERNAME:ortofrutta}
@@ -32,7 +40,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
 
 springdoc:
   swagger-ui:
@@ -41,6 +49,11 @@ springdoc:
 app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:}
+  password-reset:
+    token-ttl: ${PASSWORD_RESET_TOKEN_TTL:30m}
+    base-url: ${PASSWORD_RESET_BASE_URL:}
+  notifications:
+    recipient-emails: ${NOTIFICATION_RECIPIENT_EMAILS:}
   jwt:
     # In produzione: variabile d'ambiente JWT_SECRET, lunga e casuale (min. 32 caratteri)
     secret: ${JWT_SECRET:dev-only-secret-change-me-at-least-32-bytes!!}

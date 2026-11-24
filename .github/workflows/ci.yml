@@ -41,9 +41,35 @@ jobs:
       - run: npm ci
       - run: npm run build   # controllo dei tipi + build di produzione
 
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Secret scanning
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Kubernetes manifest validation
+        uses: azure/setup-helm@v4
+      - run: helm lint helm/ortofrutta
+      - name: Filesystem vulnerability scan
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: fs
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-results.sarif
+      - name: Upload Trivy report
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    needs: [backend, frontend]
+    needs: [backend, frontend, security]
     runs-on: ubuntu-latest
     permissions:
       contents: read

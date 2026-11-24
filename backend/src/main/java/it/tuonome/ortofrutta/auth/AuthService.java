@@ -15,13 +15,23 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.time.Instant;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AuthService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AuthService.class);
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final UserRepository users;
     private final PasswordEncoder encoder;
@@ -30,10 +40,13 @@ public class AuthService {
     private final CustomerRepository customers;
     private final RoleRepository roles;
     private final CompanyMembershipRepository memberships;
+    private final PasswordResetTokenRepository resetTokens;
+    private final JavaMailSender mailSender;
 
     public AuthService(UserRepository users, PasswordEncoder encoder,
                        JwtEncoder jwtEncoder, AppProperties props, CustomerRepository customers, RoleRepository roles,
-                       CompanyMembershipRepository memberships) {
+                       CompanyMembershipRepository memberships, PasswordResetTokenRepository resetTokens,
+                       JavaMailSender mailSender) {
         this.users = users;
         this.encoder = encoder;
         this.jwtEncoder = jwtEncoder;
@@ -41,6 +54,8 @@ public class AuthService {
         this.customers = customers;
         this.roles = roles;
         this.memberships = memberships;
+        this.resetTokens = resetTokens;
+        this.mailSender = mailSender;
     }
 
     @Transactional(readOnly = true)
@@ -128,5 +143,58 @@ public class AuthService {
             throw new BusinessException("La nuova password deve essere diversa da quella attuale");
         }
         u.changePassword(encoder.encode(request.newPassword()), false);
+    }
+
+    @Transactional
+    public void requestPasswordReset(AuthDtos.ForgotPasswordRequest request) {
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        users.findByEmailIgnoreCase(email).ifPresent(user -> {
+            Instant now = Instant.now();
+            resetTokens.invalidateActiveForUser(user.getId(), now);
+            byte[] random = new byte[32];
+            RANDOM.nextBytes(random);
+            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(random);
+            Instant expiresAt = now.plus(props.passwordReset().tokenTtl());
+            resetTokens.save(new PasswordResetToken(user, hash(token), expiresAt));
+
+            String baseUrl = props.passwordReset().baseUrl();
+            String resetLink = baseUrl == null || baseUrl.isBlank()
+                    ? "?resetToken=" + token
+                    : baseUrl.replaceAll("/+$", "") + "/?resetToken=" + token;
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                message.setTo(user.getEmail());
+                message.setSubject("Reset password Ortofrutta");
+                message.setText("Usa questo link entro 30 minuti per scegliere una nuova password:\n" + resetLink);
+                mailSender.send(message);
+            } catch (RuntimeException mailError) {
+                LOGGER.warn("Password reset token created for {}, but email delivery is unavailable", email);
+            }
+        });
+    }
+
+    @Transactional
+    public void resetPassword(AuthDtos.ResetPasswordRequest request) {
+        String hash = hash(request.token().trim());
+        PasswordResetToken reset = resetTokens.findByTokenHash(hash)
+                .filter(t -> t.isUsable(Instant.now()))
+                .orElseThrow(() -> new BusinessException("Il link di reset non è valido o è scaduto"));
+
+        AppUser user = reset.getUser();
+        user.changePassword(encoder.encode(request.newPassword()), false);
+        reset.markUsed();
+    }
+
+    private static String hash(String token) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte value : digest) {
+                hex.append(String.format("%02x", value));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException("Impossibile proteggere il token reset", e);
+        }
     }
 }
