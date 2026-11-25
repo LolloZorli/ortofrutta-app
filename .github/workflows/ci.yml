@@ -56,7 +56,7 @@ jobs:
         uses: azure/setup-helm@v4
       - run: helm lint helm/ortofrutta
       - name: Filesystem vulnerability scan
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.33.1
         with:
           scan-type: fs
           ignore-unfixed: true
