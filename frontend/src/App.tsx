@@ -24,6 +24,7 @@ const RolesPage = lazy(() => import('./pages/RolesPage'))
 const LookupsPage = lazy(() => import('./pages/LookupsPage'))
 const MorePage = lazy(() => import('./pages/MorePage'))
 const CustomerPortalPage = lazy(() => import('./pages/CustomerPortalPage'))
+const DeliverySettingsPage = lazy(() => import('./pages/DeliverySettingsPage'))
 
 /** Pagina riservata a chi ha almeno uno di questi permessi (il server li impone comunque). */
 function Guard({ perm, children }: { perm: string | string[]; children: ReactElement }) {
@@ -56,6 +57,7 @@ export default function App() {
             <Route path="magazzino" element={<Guard perm="STOCK_READ"><StockPage /></Guard>} />
             <Route path="ordini" element={<Guard perm={['SUPPLIER_ORDER_CREATE', 'SUPPLIER_ORDERS_MANAGE']}><SupplierOrdersPage /></Guard>} />
             <Route path="prenotazioni" element={<Guard perm="RESERVATIONS_MANAGE"><ReservationsPage /></Guard>} />
+            <Route path="consegne" element={<Guard perm="RESERVATIONS_MANAGE"><DeliverySettingsPage /></Guard>} />
             <Route
               path="clienti"
               element={<Guard perm={['CUSTOMERS_MANAGE', 'RESERVATIONS_MANAGE']}><ContactsPage kind="customer" /></Guard>}

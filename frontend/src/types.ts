@@ -29,7 +29,18 @@ export interface CustomerOrder {
   status: 'NEW' | 'READY' | 'PICKED_UP' | 'DELIVERED' | 'CANCELLED'; pickupDate: string; notes: string | null
   fulfillmentType: 'PICKUP' | 'DELIVERY'; deliveryAddress: string | null; deliveryCity: string | null
   deliveryPostalCode: string | null; deliveryPhone: string | null; deliveryNotes: string | null
-  createdAt: string; lines: CustomerOrderLine[]; total: number
+  createdAt: string; lines: CustomerOrderLine[]; productSubtotal: number; deliveryFee: number
+  deliverySlot: string | null; total: number
+}
+
+export interface DeliverySlot { id: number; name: string; maxOrders: number; active: boolean }
+export interface DeliveryZone {
+  id: number; city: string; deliveryFee: number; minimumOrderSubtotal: number
+  active: boolean; slots: DeliverySlot[]
+}
+export interface DeliveryOptions {
+  zoneAvailable: boolean; city: string | null; deliveryFee: number; minimumOrderSubtotal: number
+  slots: { id: number; name: string; remainingOrders: number }[]
 }
 
 export interface RoleInfo {
@@ -217,9 +228,10 @@ export interface Reservation {
   deliveryPostalCode: string | null
   deliveryPhone: string | null
   deliveryNotes: string | null
+  deliverySlot: string | null
   notes: string | null
   createdAt: string
-  lines: ReservationLine[]
+  lines: ReservationLine[]; productSubtotal: number; deliveryFee: number
   total: number
 }
 

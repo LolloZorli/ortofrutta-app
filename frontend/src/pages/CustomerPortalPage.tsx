@@ -5,7 +5,7 @@ import { Chip, Empty, ErrorBox, Field, Loading } from '../components/ui'
 import { eur, qty, todayIso } from '../format'
 import { useLoad } from '../hooks'
 import { useToast } from '../toast'
-import type { CatalogItem, CustomerOrder } from '../types'
+import type { CatalogItem, CustomerOrder, DeliveryOptions } from '../types'
 
 export default function CustomerPortalPage() {
   const { profile } = useAuth()
@@ -20,15 +20,25 @@ export default function CustomerPortalPage() {
   const [deliveryPostalCode, setDeliveryPostalCode] = useState('')
   const [deliveryPhone, setDeliveryPhone] = useState('')
   const [deliveryNotes, setDeliveryNotes] = useState('')
+  const [deliverySlotId, setDeliverySlotId] = useState('')
   const [notes, setNotes] = useState('')
   const [quantities, setQuantities] = useState<Record<number, string>>({})
   const [busy, setBusy] = useState(false)
+  const deliveryOptions = useLoad<DeliveryOptions>(() => api.get(
+    `/delivery-zones/options?city=${encodeURIComponent(deliveryCity)}&date=${encodeURIComponent(pickupDate)}`,
+  ), [deliveryCity, pickupDate, fulfillmentType])
   const visible = useMemo(() => (catalog.data ?? []).filter((item) => item.availableQuantity > 0).filter((item) =>
     `${item.name} ${item.category}`.toLowerCase().includes(search.trim().toLowerCase())), [catalog.data, search])
+  const productSubtotal = Object.entries(quantities).reduce((total, [id, quantity]) => {
+    const item = catalog.data?.find((product) => product.id === Number(id))
+    const parsed = Number(quantity.replace(',', '.'))
+    return total + (item && Number.isFinite(parsed) ? parsed * item.salePrice : 0)
+  }, 0)
 
   async function submitOrder() {
-    const lines = Object.entries(quantities).filter(([, quantity]) => Number(quantity) > 0)
-      .map(([productId, quantity]) => ({ productId: Number(productId), quantity: Number(quantity.replace(',', '.')) }))
+    const lines = Object.entries(quantities).map(([productId, quantity]) => ({
+      productId: Number(productId), quantity: Number(quantity.replace(',', '.')),
+    })).filter((line) => line.quantity > 0)
     if (lines.length === 0) return toast.error('Aggiungi almeno un prodotto')
     for (const line of lines) {
       const item = catalog.data?.find((product) => product.id === line.productId)
@@ -38,17 +48,27 @@ export default function CustomerPortalPage() {
     if (fulfillmentType === 'DELIVERY' && (!deliveryAddress.trim() || !deliveryCity.trim() || !deliveryPostalCode.trim() || !deliveryPhone.trim())) {
       return toast.error('Per la consegna indica indirizzo, città, CAP e telefono')
     }
+    if (fulfillmentType === 'DELIVERY') {
+      if (!deliveryOptions.data?.zoneAvailable) return toast.error('Non effettuiamo consegne nella città indicata')
+      if (productSubtotal < deliveryOptions.data.minimumOrderSubtotal) {
+        return toast.error(`L'importo minimo per la consegna è ${eur(deliveryOptions.data.minimumOrderSubtotal)}`)
+      }
+      if (!deliveryOptions.data.slots.some((slot) => String(slot.id) === deliverySlotId)) {
+        return toast.error('Scegli una fascia oraria disponibile')
+      }
+    }
     setBusy(true)
     try {
       await api.post('/customer-orders/mine', {
         pickupDate, notes: notes.trim() || null, lines, fulfillmentType,
-        deliveryAddress: fulfillmentType === 'DELIVERY' ? deliveryAddress.trim() : null,
+        deliveryAddress: fulfillmentType === 'DELIVERY' ? deliveryAddress : null,
         deliveryCity: fulfillmentType === 'DELIVERY' ? deliveryCity.trim() : null,
         deliveryPostalCode: fulfillmentType === 'DELIVERY' ? deliveryPostalCode.trim() : null,
         deliveryPhone: fulfillmentType === 'DELIVERY' ? deliveryPhone.trim() : null,
         deliveryNotes: fulfillmentType === 'DELIVERY' ? deliveryNotes.trim() || null : null,
+        deliverySlotId: fulfillmentType === 'DELIVERY' ? Number(deliverySlotId) : null,
       })
-      setQuantities({}); setNotes(''); setPickupDate(''); setDeliveryNotes('')
+      setQuantities({}); setNotes(''); setPickupDate(''); setDeliveryNotes(''); setDeliverySlotId('')
       orders.reload()
       toast.ok('Ordine inviato al negozio')
     } catch (error) { toast.error(errorMessage(error)) } finally { setBusy(false) }
@@ -80,15 +100,32 @@ export default function CustomerPortalPage() {
       <Field label="Come vuoi ricevere l’ordine?"><select value={fulfillmentType} onChange={(event) => setFulfillmentType(event.target.value as 'PICKUP' | 'DELIVERY')}>
         <option value="PICKUP">Ritiro in negozio</option><option value="DELIVERY">Consegna a domicilio</option>
       </select></Field>
-      <Field label={fulfillmentType === 'DELIVERY' ? 'Data di consegna' : 'Data di ritiro'}><input type="date" min={todayIso()} value={pickupDate} onChange={(event) => setPickupDate(event.target.value)} /></Field>
+      <Field label={fulfillmentType === 'DELIVERY' ? 'Data di consegna' : 'Data di ritiro'}><input type="date" min={todayIso()} value={pickupDate} onChange={(event) => {
+        setPickupDate(event.target.value)
+        setDeliverySlotId('')
+      }} /></Field>
       {fulfillmentType === 'DELIVERY' && <>
         <Field label="Indirizzo di consegna"><input autoComplete="street-address" maxLength={250} value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} required /></Field>
         <div className="row wrap">
-          <Field label="Città"><input autoComplete="address-level2" maxLength={120} value={deliveryCity} onChange={(event) => setDeliveryCity(event.target.value)} required /></Field>
+          <Field label="Città"><input autoComplete="address-level2" maxLength={120} value={deliveryCity} onChange={(event) => {
+            setDeliveryCity(event.target.value)
+            setDeliverySlotId('')
+          }} required /></Field>
           <Field label="CAP"><input autoComplete="postal-code" maxLength={20} value={deliveryPostalCode} onChange={(event) => setDeliveryPostalCode(event.target.value)} required /></Field>
         </div>
         <Field label="Telefono per la consegna"><input autoComplete="tel" inputMode="tel" maxLength={30} value={deliveryPhone} onChange={(event) => setDeliveryPhone(event.target.value)} required /></Field>
         <Field label="Istruzioni per il corriere (facoltative)"><textarea rows={2} maxLength={500} value={deliveryNotes} onChange={(event) => setDeliveryNotes(event.target.value)} /></Field>
+        {deliveryOptions.data?.zoneAvailable ? <>
+          <div className="item-sub">Consegna: {eur(deliveryOptions.data.deliveryFee)} · minimo prodotti: {eur(deliveryOptions.data.minimumOrderSubtotal)}</div>
+          <Field label="Fascia oraria"><select value={deliverySlotId} onChange={(event) => setDeliverySlotId(event.target.value)} required>
+            <option value="">Scegli una fascia…</option>
+            {deliveryOptions.data.slots.map((slot) => <option key={slot.id} value={slot.id}>
+              {slot.name} · {slot.remainingOrders} posti disponibili
+            </option>)}
+          </select></Field>
+          {deliveryOptions.data.slots.length === 0 && <div className="item-sub">Nessuna fascia disponibile per questa data.</div>}
+        </> : deliveryCity.trim() && pickupDate ? <div className="item-sub">Nessuna zona attiva per questa città.</div> : null}
+        <div className="price-line"><span>Totale ordine</span><strong>{eur(productSubtotal + (deliveryOptions.data?.zoneAvailable ? deliveryOptions.data.deliveryFee : 0))}</strong></div>
       </>}
       <Field label="Note per il negozio"><textarea rows={2} maxLength={500} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Orario preferito o richieste" /></Field>
       <button className="btn btn-primary btn-block" disabled={busy} onClick={submitOrder}>{busy ? 'Invio…' : 'Invia ordine'}</button>
@@ -102,9 +139,10 @@ export default function CustomerPortalPage() {
               <Chip tone={order.status === 'READY' || order.status === 'DELIVERED' || order.status === 'PICKED_UP' ? 'green' : order.status === 'CANCELLED' ? 'red' : 'orange'}>
                 {order.status === 'NEW' ? 'In attesa' : order.status === 'READY' ? 'In preparazione' : order.status === 'PICKED_UP' ? 'Ritirato' : order.status === 'DELIVERED' ? 'Consegnato' : 'Annullato'}
               </Chip></div>
-            {order.fulfillmentType === 'DELIVERY' && <div className="item-sub">{order.deliveryAddress}, {order.deliveryPostalCode} {order.deliveryCity} · Tel. {order.deliveryPhone}</div>}
+            {order.fulfillmentType === 'DELIVERY' && <div className="item-sub">{order.deliveryAddress}, {order.deliveryPostalCode} {order.deliveryCity} · Tel. {order.deliveryPhone}{order.deliverySlot ? ` · ${order.deliverySlot}` : ''}</div>}
             {order.lines.map((line) => <div className="row between" key={line.id}><span>{line.productName} · {qty(line.quantity, line.unit)}</span><span>{eur(line.quantity * line.unitPrice)}</span></div>)}
-            <div className="price-line"><span>Totale indicativo</span><strong>{eur(order.total)}</strong></div>
+            {order.fulfillmentType === 'DELIVERY' && <div className="row between"><span>Costo consegna</span><span>{eur(order.deliveryFee)}</span></div>}
+            <div className="price-line"><span>Totale</span><strong>{eur(order.total)}</strong></div>
             {order.notes && <div className="item-sub">Nota: {order.notes}</div>}
           </article>)}
     </section>

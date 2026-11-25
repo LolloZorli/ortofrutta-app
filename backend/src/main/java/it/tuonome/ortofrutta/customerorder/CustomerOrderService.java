@@ -12,6 +12,7 @@ import it.tuonome.ortofrutta.product.Product;
 import it.tuonome.ortofrutta.product.ProductRepository;
 import it.tuonome.ortofrutta.lookup.LookupService;
 import it.tuonome.ortofrutta.lookup.LookupType;
+import it.tuonome.ortofrutta.delivery.DeliveryService;
 import it.tuonome.ortofrutta.sale.SaleItem;
 import it.tuonome.ortofrutta.sale.SaleService;
 import org.springframework.data.domain.PageRequest;
@@ -43,10 +44,11 @@ public class CustomerOrderService {
     private final UserRepository users;
     private final CompanyMembershipRepository memberships;
     private final JdbcClient jdbc;
+    private final DeliveryService delivery;
 
     public CustomerOrderService(CustomerOrderRepository orders, CustomerRepository customers,
                                 ProductRepository products, SaleService sales, LookupService lookups, UserRepository users,
-                                CompanyMembershipRepository memberships, JdbcClient jdbc) {
+                                CompanyMembershipRepository memberships, JdbcClient jdbc, DeliveryService delivery) {
         this.orders = orders;
         this.customers = customers;
         this.products = products;
@@ -55,6 +57,7 @@ public class CustomerOrderService {
         this.users = users;
         this.memberships = memberships;
         this.jdbc = jdbc;
+        this.delivery = delivery;
     }
 
     /** Aperte: tutte. Storico: le ultime 100. */
@@ -103,6 +106,7 @@ public class CustomerOrderService {
                 throw new BusinessException("Disponibilità insufficiente per \"" + product.getName() + "\": disponibili " + available);
             }
         }
+        BigDecimal subtotal = BigDecimal.ZERO;
         for (CustomerOrderDtos.CustomerLineRequest line : request.lines()) {
             Product product = products.findById(line.productId())
                     .orElseThrow(() -> new NotFoundException("Prodotto", line.productId()));
@@ -112,7 +116,10 @@ public class CustomerOrderService {
                 throw new BusinessException("Per \"" + product.getName() + "\" la quantità deve essere intera");
             }
             order.addLine(product, line.quantity(), product.getSalePrice());
+            subtotal = subtotal.add(line.quantity().multiply(product.getSalePrice()));
         }
+        applyDeliveryTerms(order, request.fulfillmentType(), request.deliveryCity(), request.pickupDate(),
+                request.deliverySlotId(), subtotal);
         return CustomerOrderDtos.Response.from(orders.save(order), lookups);
     }
 
@@ -120,15 +127,21 @@ public class CustomerOrderService {
     public CustomerOrderDtos.Response create(CustomerOrderDtos.Request r, boolean canOverridePrice) {
         Customer customer = customers.findById(r.customerId())
                 .orElseThrow(() -> new NotFoundException("Cliente", r.customerId()));
+        if (r.pickupDate().isBefore(java.time.LocalDate.now())) {
+            throw new BusinessException("La data dell'ordine non può essere nel passato");
+        }
         validateDelivery(r.fulfillmentType(), r.deliveryAddress(), r.deliveryCity(), r.deliveryPostalCode(), r.deliveryPhone());
         CustomerOrder order = new CustomerOrder(customer, r.pickupDate(), r.notes(), r.fulfillmentType(),
                 r.deliveryAddress(), r.deliveryCity(), r.deliveryPostalCode(), r.deliveryPhone(), r.deliveryNotes());
+        BigDecimal subtotal = BigDecimal.ZERO;
         for (CustomerOrderDtos.LineRequest l : r.lines()) {
             Product p = products.findById(l.productId())
                     .orElseThrow(() -> new NotFoundException("Prodotto", l.productId()));
-            order.addLine(p, l.quantity(),
-                    canOverridePrice && l.unitPrice() != null ? l.unitPrice() : p.getSalePrice());
+            BigDecimal price = canOverridePrice && l.unitPrice() != null ? l.unitPrice() : p.getSalePrice();
+            order.addLine(p, l.quantity(), price);
+            subtotal = subtotal.add(l.quantity().multiply(price));
         }
+        applyDeliveryTerms(order, r.fulfillmentType(), r.deliveryCity(), r.pickupDate(), r.deliverySlotId(), subtotal);
         return CustomerOrderDtos.Response.from(orders.save(order), lookups);
     }
 
@@ -168,7 +181,7 @@ public class CustomerOrderService {
         for (CustomerOrderLine line : o.getLines()) {
             items.add(new SaleItem(line.getProduct().getId(), line.getQuantity(), line.getUnitPrice()));
         }
-        sales.create(items, paymentMethodId, o.getCustomer().getId());
+        sales.create(items, paymentMethodId, o.getCustomer().getId(), o.getDeliveryFee());
         o.setStatus(CustomerOrderStatus.DELIVERED);
         return CustomerOrderDtos.Response.from(o, lookups);
     }
@@ -199,6 +212,15 @@ public class CustomerOrderService {
         if (type == FulfillmentType.DELIVERY && (blank(address) || blank(city) || blank(postalCode) || blank(phone))) {
             throw new BusinessException("Per la consegna indica indirizzo, città, CAP e telefono");
         }
+    }
+
+    private void applyDeliveryTerms(CustomerOrder order, FulfillmentType type, String city,
+                                    java.time.LocalDate date, Long slotId, BigDecimal subtotal) {
+        if (type != FulfillmentType.DELIVERY) return;
+        if (slotId == null) throw new BusinessException("Scegli una fascia oraria per la consegna");
+        var terms = delivery.reserve(city, date, slotId,
+                subtotal.setScale(2, java.math.RoundingMode.HALF_UP));
+        order.setDeliveryTerms(terms.zoneId(), terms.slotId(), terms.slotName(), terms.fee());
     }
 
     private static boolean blank(String value) { return value == null || value.isBlank(); }

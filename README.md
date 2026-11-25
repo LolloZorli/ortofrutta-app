@@ -14,7 +14,7 @@ Interfaccia pensata per il telefono, da usare con una mano dietro al banco.
 | **Magazzino** | Giacenze, conteggio fisico con rettifica tracciata, lotti con scadenza, carico merce, scarti con motivo, storico movimenti paginato con l'operatore |
 | **Lotti FIFO** | Ogni arrivo è un lotto con costo e scadenza; le vendite consumano prima il più vecchio, così il margine è reale |
 | **Ordini fornitori** | Bozza, invio (link WhatsApp), arrivo merce con correzione di quantità/costo; precompilazione dai prodotti sotto scorta |
-| **Ordini clienti** | Ritiro in negozio o consegna a domicilio, con data, indirizzo e telefono. Nuovo → In preparazione → Ritirato/Consegnato. Il completamento crea la vendita e scarica il magazzino |
+| **Ordini clienti** | Ritiro in negozio o consegna a domicilio con zona, tariffa e capienza per fascia/data configurabili. Nuovo → In preparazione → Ritirato/Consegnato. Il completamento crea la vendita e scarica il magazzino |
 | **Corrispettivi** | Riepilogo giornaliero per aliquota IVA (imponibile e imposta scorporati) e per metodo di pagamento; chiusura contanti con differenza tra atteso e contato |
 | **Clienti** | Anagrafica e storico acquisti associati alle vendite |
 | **Portale clienti** | Registrazione con email e password, catalogo senza giacenze interne, invio e consultazione dei propri ordini |
@@ -87,9 +87,11 @@ registrazione azienda. Il commesso seleziona il negozio e crea l'account; il res
 un negozio dall'elenco e può cambiare negozio dal pulsante in alto; il logout è disponibile per tutti i ruoli.
 
 Nel portale ordini il cliente sceglie tra ritiro e consegna a domicilio. Per la consegna inserisce indirizzo,
-città, CAP e telefono; il negozio vede i dettagli, prepara l'ordine e registra la consegna con il metodo di
-pagamento, generando la vendita e lo scarico del magazzino. La data resta una data (senza fascia oraria). Non
-sono ancora configurabili tariffe o zone di consegna per azienda: per ora l'ordine non aggiunge costi di consegna.
+città, CAP e telefono, e sceglie una fascia oraria disponibile. In **Altro → Zone e fasce di consegna** il
+responsabile delle prenotazioni configura le città servite (corrispondenza senza distinzione tra maiuscole e
+minuscole), costo, minimo d'ordine e capienza massima per fascia e data. Il costo si aggiunge al totale e alla
+vendita quando il negozio registra la consegna; tariffa e fascia restano salvate sull'ordine anche se la
+configurazione viene modificata in seguito. Il ritiro in negozio mantiene il comportamento solo-data.
 
 ## Efficienza
 
@@ -198,7 +200,7 @@ V6 aggiunge gli account email dei clienti e V7 aggiorna la descrizione del ruolo
 **V8** introduce il modello multi-azienda e assegna i dati esistenti allo shop `ortofrutta`; **V9** aggiunge
 ritiro/consegna agli ordini clienti; **V10** aggiunge l'approvazione delle richieste staff e i permessi
 aggiuntivi di responsabile e commesso; **V11** aggiunge gli indici per il catalogo clienti e la disponibilità.
-**V12** aggiunge i token monouso per il reset password.
+**V12** aggiunge i token monouso per il reset password; **V13** aggiunge zone, tariffe e fasce di consegna configurabili.
 Prima di aggiornare un database già usato, fai un backup. Flyway applica le migrazioni all'avvio del backend.
 Verifica le aliquote IVA prima di usare dati reali.
 
@@ -251,7 +253,7 @@ Se Testcontainers segnala che l'API Docker `1.32` è troppo vecchia, imposta
 - `RolesTest`: permessi dei ruoli operativi e Cliente, registrazione cliente, ruoli personalizzati, permessi riservati, password temporanee, utenti disattivati
 - `LookupsTest`: solo l'admin crea tipologiche, duplicati, valori disattivati, regole su unità e IVA
 - `SalesTest`: carrello, storno, corrispettivi per IVA (con vendite stornate escluse), ritiro prenotazioni, vendite visibili solo al proprio autore
-- `CustomerPortalTest`: catalogo senza costi o giacenze, ordine al prezzo di listino, consegna a domicilio, completamento con vendita e visibilità limitata ai propri ordini
+- `CustomerPortalTest`: catalogo senza costi o giacenze, ordine al prezzo di listino, consegna a domicilio con tariffa/capienza, completamento con vendita e visibilità limitata ai propri ordini
 - `CompanyIsolationTest`: registrazione aziende, utenti e ruoli separati, cataloghi e ordini isolati, account cliente condiviso fra negozi
 - `EmployeeRegistrationTest`: richiesta commesso, accesso bloccato prima dell'approvazione e attivazione da parte del responsabile
 

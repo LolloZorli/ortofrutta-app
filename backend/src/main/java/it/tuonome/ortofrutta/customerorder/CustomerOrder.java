@@ -54,6 +54,18 @@ public class CustomerOrder extends CompanyScopedEntity {
     @Column(name = "delivery_notes", length = 500)
     private String deliveryNotes;
 
+    @Column(name = "delivery_zone_id")
+    private Long deliveryZoneId;
+
+    @Column(name = "delivery_slot_id")
+    private Long deliverySlotId;
+
+    @Column(name = "delivery_slot", length = 80)
+    private String deliverySlot;
+
+    @Column(name = "delivery_fee", nullable = false, precision = 12, scale = 2)
+    private BigDecimal deliveryFee = BigDecimal.ZERO;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -75,7 +87,7 @@ public class CustomerOrder extends CompanyScopedEntity {
         this.pickupDate = pickupDate;
         this.notes = notes == null || notes.isBlank() ? null : notes.trim();
         this.fulfillmentType = fulfillmentType == null ? FulfillmentType.PICKUP : fulfillmentType;
-        this.deliveryAddress = clean(deliveryAddress);
+        this.deliveryAddress = deliveryAddress;
         this.deliveryCity = clean(deliveryCity);
         this.deliveryPostalCode = clean(deliveryPostalCode);
         this.deliveryPhone = clean(deliveryPhone);
@@ -89,6 +101,12 @@ public class CustomerOrder extends CompanyScopedEntity {
     }
 
     public void setStatus(CustomerOrderStatus status) { this.status = status; }
+    public void setDeliveryTerms(Long zoneId, Long slotId, String slot, BigDecimal fee) {
+        this.deliveryZoneId = zoneId;
+        this.deliverySlotId = slotId;
+        this.deliverySlot = slot;
+        this.deliveryFee = fee;
+    }
     public boolean isDelivery() { return fulfillmentType == FulfillmentType.DELIVERY; }
 
     public Long getId() { return id; }
@@ -102,6 +120,10 @@ public class CustomerOrder extends CompanyScopedEntity {
     public String getDeliveryPostalCode() { return deliveryPostalCode; }
     public String getDeliveryPhone() { return deliveryPhone; }
     public String getDeliveryNotes() { return deliveryNotes; }
+    public Long getDeliveryZoneId() { return deliveryZoneId; }
+    public Long getDeliverySlotId() { return deliverySlotId; }
+    public String getDeliverySlot() { return deliverySlot; }
+    public BigDecimal getDeliveryFee() { return deliveryFee; }
     public Instant getCreatedAt() { return createdAt; }
     public List<CustomerOrderLine> getLines() { return lines; }
 }

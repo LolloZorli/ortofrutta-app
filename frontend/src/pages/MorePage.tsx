@@ -17,6 +17,7 @@ const ITEMS: Item[] = [
   { to: '/prodotti', label: '🥕 Prodotti e prezzi di listino', perms: ['PRODUCTS_WRITE'] },
   { to: '/fornitori', label: '🚚 Fornitori', perms: ['SUPPLIERS_READ', 'SUPPLIERS_MANAGE'] },
   { to: '/clienti', label: '👥 Clienti', perms: ['CUSTOMERS_MANAGE', 'RESERVATIONS_MANAGE'] },
+  { to: '/consegne', label: '🚚 Zone e fasce di consegna', perms: ['RESERVATIONS_MANAGE'] },
   { to: '/corrispettivi', label: '🧾 Corrispettivi del giorno', perms: ['REPORTS_VIEW'] },
   { to: '/report', label: '📊 Report: vendite, margini, scarti', perms: ['REPORTS_VIEW'] },
   { to: '/registro', label: '📜 Registro attività', perms: ['AUDIT_VIEW'] },

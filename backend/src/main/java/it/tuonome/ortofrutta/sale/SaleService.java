@@ -81,6 +81,12 @@ public class SaleService {
 
     @Transactional
     public SaleDtos.Response create(List<SaleItem> items, Long paymentMethodId, Long customerId) {
+        return create(items, paymentMethodId, customerId, BigDecimal.ZERO);
+    }
+
+    @Transactional
+    public SaleDtos.Response create(List<SaleItem> items, Long paymentMethodId, Long customerId,
+                                   BigDecimal additionalAmount) {
         LookupItem method = lookups.requireActive(LookupType.PAYMENT_METHOD, paymentMethodId, "Metodo di pagamento");
         Sale sale = sales.save(new Sale(CurrentUser.name(), method.id(), customerId));
         BigDecimal total = BigDecimal.ZERO;
@@ -88,6 +94,7 @@ public class SaleService {
             stock.sellProduct(item.productId(), item.quantity(), item.unitPrice(), sale.getId());
             total = total.add(item.quantity().multiply(item.unitPrice()));
         }
+        if (additionalAmount != null) total = total.add(additionalAmount);
         sale.setTotal(total.setScale(2, RoundingMode.HALF_UP));
         return toResponse(sale, true);
     }

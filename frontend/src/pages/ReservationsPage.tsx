@@ -7,7 +7,7 @@ import { dateIt, eur, parseDecimal, qty, tomorrowIso } from '../format'
 import { useLoad } from '../hooks'
 import { useLookups } from '../lookups'
 import { useToast } from '../toast'
-import type { Customer, Product, Reservation, ReservationStatus } from '../types'
+import type { Customer, DeliveryOptions, Product, Reservation, ReservationStatus } from '../types'
 
 const STATUS: Record<ReservationStatus, { label: string; tone: 'blue' | 'green' | 'gray' | 'red' }> = {
   NEW: { label: 'Nuova', tone: 'blue' },
@@ -96,7 +96,7 @@ function ReservationCard({ reservation: r, onChanged }: { reservation: Reservati
         <Chip tone={st.tone}>{st.label}</Chip>
       </div>
       {r.fulfillmentType === 'DELIVERY' && <div className="item-sub" style={{ marginTop: 8 }}>
-        <strong>Indirizzo:</strong> {r.deliveryAddress}, {r.deliveryPostalCode} {r.deliveryCity}<br />
+        <strong>Indirizzo:</strong> {r.deliveryAddress}, {r.deliveryPostalCode} {r.deliveryCity}{r.deliverySlot && <> · <strong>Fascia:</strong> {r.deliverySlot}</>}<br />
         <strong>Telefono:</strong> {r.deliveryPhone}{r.deliveryNotes && <><br /><strong>Istruzioni:</strong> {r.deliveryNotes}</>}
       </div>}
       <ul className="lines-summary">
@@ -111,6 +111,7 @@ function ReservationCard({ reservation: r, onChanged }: { reservation: Reservati
         <span className="muted">Totale</span>
         <strong>{eur(r.total)}</strong>
       </div>
+      {r.fulfillmentType === 'DELIVERY' && <div className="item-sub">Prodotti {eur(r.productSubtotal)} · Consegna {eur(r.deliveryFee)}</div>}
       {open && (
         <div className="row wrap" style={{ marginTop: 10 }}>
           {r.status === 'NEW' && (
@@ -202,9 +203,18 @@ function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [deliveryPostalCode, setDeliveryPostalCode] = useState('')
   const [deliveryPhone, setDeliveryPhone] = useState('')
   const [deliveryNotes, setDeliveryNotes] = useState('')
+  const [deliverySlotId, setDeliverySlotId] = useState('')
   const [notes, setNotes] = useState('')
   const [lines, setLines] = useState<DraftLine[]>([{ productId: '', quantity: '' }])
   const [busy, setBusy] = useState(false)
+  const deliveryOptions = useLoad<DeliveryOptions>(() => api.get(
+    `/delivery-zones/options?city=${encodeURIComponent(deliveryCity)}&date=${encodeURIComponent(pickupDate)}`,
+  ), [deliveryCity, pickupDate, fulfillmentType])
+  const productSubtotal = lines.reduce((total, line) => {
+    const product = products.data?.find((item) => String(item.id) === line.productId)
+    const quantity = parseDecimal(line.quantity)
+    return total + (product && Number.isFinite(quantity) ? quantity * product.salePrice : 0)
+  }, 0)
 
   function setLine(i: number, patch: Partial<DraftLine>) {
     setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
@@ -226,6 +236,15 @@ function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
     if (fulfillmentType === 'DELIVERY' && (!deliveryAddress.trim() || !deliveryCity.trim() || !deliveryPostalCode.trim() || !deliveryPhone.trim())) {
       return toast.error('Per la consegna indica indirizzo, città, CAP e telefono')
     }
+    if (fulfillmentType === 'DELIVERY') {
+      if (!deliveryOptions.data?.zoneAvailable) return toast.error('Non effettuiamo consegne nella città indicata')
+      if (productSubtotal < deliveryOptions.data.minimumOrderSubtotal) {
+        return toast.error(`L'importo minimo per la consegna è ${eur(deliveryOptions.data.minimumOrderSubtotal)}`)
+      }
+      if (!deliveryOptions.data.slots.some((slot) => String(slot.id) === deliverySlotId)) {
+        return toast.error('Scegli una fascia oraria disponibile')
+      }
+    }
 
     setBusy(true)
     try {
@@ -236,11 +255,12 @@ function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
       }
       await api.post('/customer-orders', {
         customerId: id, pickupDate, notes: notes.trim() || null, lines: body, fulfillmentType,
-        deliveryAddress: fulfillmentType === 'DELIVERY' ? deliveryAddress.trim() : null,
+        deliveryAddress: fulfillmentType === 'DELIVERY' ? deliveryAddress : null,
         deliveryCity: fulfillmentType === 'DELIVERY' ? deliveryCity.trim() : null,
         deliveryPostalCode: fulfillmentType === 'DELIVERY' ? deliveryPostalCode.trim() : null,
         deliveryPhone: fulfillmentType === 'DELIVERY' ? deliveryPhone.trim() : null,
         deliveryNotes: fulfillmentType === 'DELIVERY' ? deliveryNotes.trim() || null : null,
+        deliverySlotId: fulfillmentType === 'DELIVERY' ? Number(deliverySlotId) : null,
       })
       toast.ok('Prenotazione creata')
       onCreated()
@@ -287,16 +307,33 @@ function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
           <option value="PICKUP">Ritiro in negozio</option><option value="DELIVERY">Consegna a domicilio</option>
         </select></Field>
         <Field label={fulfillmentType === 'DELIVERY' ? 'Data di consegna' : 'Data di ritiro'}>
-          <input type="date" value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} required />
+          <input type="date" value={pickupDate} onChange={(e) => {
+            setPickupDate(e.target.value)
+            setDeliverySlotId('')
+          }} required />
         </Field>
         {fulfillmentType === 'DELIVERY' && <>
           <Field label="Indirizzo di consegna"><input maxLength={250} value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} required /></Field>
           <div className="row wrap">
-            <Field label="Città"><input maxLength={120} value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} required /></Field>
+            <Field label="Città"><input maxLength={120} value={deliveryCity} onChange={(e) => {
+              setDeliveryCity(e.target.value)
+              setDeliverySlotId('')
+            }} required /></Field>
             <Field label="CAP"><input maxLength={20} value={deliveryPostalCode} onChange={(e) => setDeliveryPostalCode(e.target.value)} required /></Field>
           </div>
           <Field label="Telefono per la consegna"><input maxLength={30} value={deliveryPhone} onChange={(e) => setDeliveryPhone(e.target.value)} required /></Field>
           <Field label="Istruzioni per il corriere"><textarea rows={2} maxLength={500} value={deliveryNotes} onChange={(e) => setDeliveryNotes(e.target.value)} /></Field>
+          {deliveryOptions.data?.zoneAvailable ? <>
+            <div className="item-sub">Consegna: {eur(deliveryOptions.data.deliveryFee)} · minimo prodotti: {eur(deliveryOptions.data.minimumOrderSubtotal)}</div>
+            <Field label="Fascia oraria"><select value={deliverySlotId} onChange={(e) => setDeliverySlotId(e.target.value)} required>
+              <option value="">Scegli una fascia…</option>
+              {deliveryOptions.data.slots.map((slot) => <option key={slot.id} value={slot.id}>
+                {slot.name} · {slot.remainingOrders} posti disponibili
+              </option>)}
+            </select></Field>
+            {deliveryOptions.data.slots.length === 0 && <div className="item-sub">Nessuna fascia disponibile per questa data.</div>}
+          </> : deliveryCity.trim() && pickupDate ? <div className="item-sub">Nessuna zona attiva per questa città.</div> : null}
+          <div className="price-line"><span>Totale ordine</span><strong>{eur(productSubtotal + (deliveryOptions.data?.zoneAvailable ? deliveryOptions.data.deliveryFee : 0))}</strong></div>
         </>}
 
         <div className="stack">

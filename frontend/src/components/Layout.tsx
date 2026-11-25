@@ -26,6 +26,7 @@ const TITLES: Record<string, string> = {
   '/magazzino': 'Magazzino',
   '/ordini': 'Ordini ai fornitori',
   '/prenotazioni': 'Prenotazioni clienti',
+  '/consegne': 'Zone e fasce di consegna',
   '/area-clienti': 'Ordini online',
   '/altro': 'Altro',
   '/prodotti': 'Prodotti e prezzi',

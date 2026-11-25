@@ -34,10 +34,11 @@ public final class CustomerOrderDtos {
             @Size(max = 120) String deliveryCity,
             @Size(max = 20) String deliveryPostalCode,
             @Size(max = 30) String deliveryPhone,
-            @Size(max = 500) String deliveryNotes
+            @Size(max = 500) String deliveryNotes,
+            Long deliverySlotId
     ) {
         public Request(Long customerId, LocalDate pickupDate, String notes, List<LineRequest> lines) {
-            this(customerId, pickupDate, notes, lines, FulfillmentType.PICKUP, null, null, null, null, null);
+            this(customerId, pickupDate, notes, lines, FulfillmentType.PICKUP, null, null, null, null, null, null);
         }
     }
 
@@ -48,7 +49,8 @@ public final class CustomerOrderDtos {
                                   @Size(max = 120) String deliveryCity,
                                   @Size(max = 20) String deliveryPostalCode,
                                   @Size(max = 30) String deliveryPhone,
-                                  @Size(max = 500) String deliveryNotes) { }
+                                  @Size(max = 500) String deliveryNotes,
+                                  Long deliverySlotId) { }
 
     public record CustomerLineRequest(@NotNull Long productId,
                                       @NotNull @DecimalMin("0.001") BigDecimal quantity) { }
@@ -66,22 +68,27 @@ public final class CustomerOrderDtos {
     public record Response(
             Long id, Long customerId, String customerName, String customerPhone,
             CustomerOrderStatus status, LocalDate pickupDate, String notes, Instant createdAt,
-            List<LineResponse> lines, BigDecimal total, FulfillmentType fulfillmentType,
+            List<LineResponse> lines, BigDecimal productSubtotal, BigDecimal deliveryFee,
+            BigDecimal total, FulfillmentType fulfillmentType,
             String deliveryAddress, String deliveryCity, String deliveryPostalCode,
-            String deliveryPhone, String deliveryNotes
+            String deliveryPhone, String deliveryNotes, String deliverySlot
     ) {
         static Response from(CustomerOrder o, LookupService lookups) {
             List<LineResponse> lines = o.getLines().stream()
                     .map(l -> new LineResponse(l.getId(), l.getProduct().getId(), l.getProduct().getName(),
                             lookups.unitLabel(l.getProduct().getUnitId()), l.getQuantity(), l.getUnitPrice()))
                     .toList();
-            BigDecimal total = lines.stream()
+            BigDecimal subtotal = lines.stream()
                     .map(l -> l.quantity().multiply(l.unitPrice()))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
+            subtotal = subtotal.setScale(2, java.math.RoundingMode.HALF_UP);
+            BigDecimal fee = o.getDeliveryFee() == null ? BigDecimal.ZERO : o.getDeliveryFee();
+            BigDecimal total = subtotal.add(fee).setScale(2, java.math.RoundingMode.HALF_UP);
             return new Response(o.getId(), o.getCustomer().getId(), o.getCustomer().getName(),
                     o.getCustomer().getPhone(), o.getStatus(), o.getPickupDate(), o.getNotes(),
-                    o.getCreatedAt(), lines, total, o.getFulfillmentType(), o.getDeliveryAddress(),
-                    o.getDeliveryCity(), o.getDeliveryPostalCode(), o.getDeliveryPhone(), o.getDeliveryNotes());
+                    o.getCreatedAt(), lines, subtotal, fee, total, o.getFulfillmentType(), o.getDeliveryAddress(),
+                    o.getDeliveryCity(), o.getDeliveryPostalCode(), o.getDeliveryPhone(), o.getDeliveryNotes(),
+                    o.getDeliverySlot());
         }
     }
 }
