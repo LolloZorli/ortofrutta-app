@@ -20,7 +20,7 @@ Interfaccia pensata per il telefono, da usare con una mano dietro al banco.
 | **Portale clienti** | Registrazione con email e password, catalogo senza giacenze interne, invio e consultazione dei propri ordini |
 | **Cartellini** | Stampa dei cartellini prezzo dei prodotti attivi e filtrati |
 | **Report** | Incasso, valore magazzino, margine, scarti, più venduti, lotti in scadenza, report per prodotto |
-| **Tipologiche** | Categorie, unità di misura, aliquote IVA, origini, motivi di scarto, metodi di pagamento, tipi di cliente: **solo l'admin le gestisce** |
+| **Tipologiche** | Categorie, unità di misura, aliquote IVA, origini, motivi di scarto, metodi di pagamento, tipi di cliente e fornitore: **solo l'admin le gestisce** |
 | **Ruoli e permessi** | Ruoli e permessi indipendenti per ogni azienda; 4 ruoli operativi e il ruolo Cliente |
 | **Registro attività** | Chi ha cambiato prezzi, utenti, ruoli, tipologiche, chi ha stornato una vendita |
 
@@ -38,6 +38,7 @@ Ognuna è una tabella a sé, con chiavi esterne dai dati che la usano.
 | Motivi di scarto | scarti | si sceglie da elenco, non testo libero: i report degli scarti diventano confrontabili |
 | Metodi di pagamento | cassa, prenotazioni, corrispettivi | |
 | Tipi di cliente | clienti | facoltativo |
+| Tipi di fornitore | fornitori | azienda agricola/produttore, grossista, mercato, cooperativa, importatore; filtrabili nell'anagrafica. Quelli già presenti vengono classificati come "Altro" dalla migrazione |
 
 - I valori **non si cancellano** (i dati storici li usano): si **disattivano**, e non si possono più assegnare ai nuovi dati.
 - Gli **stati dei flussi** (bozza/inviato/ricevuto, nuova/pronta/ritirata) *non* sono tipologiche: la logica del codice dipende da loro.
@@ -200,7 +201,8 @@ V6 aggiunge gli account email dei clienti e V7 aggiorna la descrizione del ruolo
 **V8** introduce il modello multi-azienda e assegna i dati esistenti allo shop `ortofrutta`; **V9** aggiunge
 ritiro/consegna agli ordini clienti; **V10** aggiunge l'approvazione delle richieste staff e i permessi
 aggiuntivi di responsabile e commesso; **V11** aggiunge gli indici per il catalogo clienti e la disponibilità.
-**V12** aggiunge i token monouso per il reset password; **V13** aggiunge zone, tariffe e fasce di consegna configurabili.
+**V12** aggiunge i token monouso per il reset password; **V13** aggiunge zone, tariffe e fasce di consegna configurabili;
+**V14** aggiunge la classificazione dei fornitori.
 Prima di aggiornare un database già usato, fai un backup. Flyway applica le migrazioni all'avvio del backend.
 Verifica le aliquote IVA prima di usare dati reali.
 
@@ -251,7 +253,7 @@ Se Testcontainers segnala che l'API Docker `1.32` è troppo vecchia, imposta
 - `LookupSlugTest`: generazione dei codici delle tipologiche
 - `ApiFlowTest`: carico, vendita, scarto, atomicità della vendita, paginazione
 - `RolesTest`: permessi dei ruoli operativi e Cliente, registrazione cliente, ruoli personalizzati, permessi riservati, password temporanee, utenti disattivati
-- `LookupsTest`: solo l'admin crea tipologiche, duplicati, valori disattivati, regole su unità e IVA
+- `LookupsTest`: solo l'admin crea tipologiche, duplicati, valori disattivati, regole su unità e IVA, tipo fornitore
 - `SalesTest`: carrello, storno, corrispettivi per IVA (con vendite stornate escluse), ritiro prenotazioni, vendite visibili solo al proprio autore
 - `CustomerPortalTest`: catalogo senza costi o giacenze, ordine al prezzo di listino, consegna a domicilio con tariffa/capienza, completamento con vendita e visibilità limitata ai propri ordini
 - `CompanyIsolationTest`: registrazione aziende, utenti e ruoli separati, cataloghi e ordini isolati, account cliente condiviso fra negozi

@@ -2,6 +2,8 @@ package it.tuonome.ortofrutta.supplier;
 
 import it.tuonome.ortofrutta.common.BusinessException;
 import it.tuonome.ortofrutta.common.NotFoundException;
+import it.tuonome.ortofrutta.lookup.LookupService;
+import it.tuonome.ortofrutta.lookup.LookupType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,13 +14,17 @@ import java.util.List;
 public class SupplierService {
 
     private final SupplierRepository suppliers;
+    private final LookupService lookups;
 
-    public SupplierService(SupplierRepository suppliers) {
+    public SupplierService(SupplierRepository suppliers, LookupService lookups) {
         this.suppliers = suppliers;
+        this.lookups = lookups;
     }
 
     public List<SupplierDtos.Response> list() {
-        return suppliers.findAllByOrderByNameAsc().stream().map(SupplierDtos.Response::from).toList();
+        return suppliers.findAllByOrderByNameAsc().stream()
+                .map(s -> SupplierDtos.Response.from(s, lookups.name(LookupType.SUPPLIER_TYPE, s.getTypeId())))
+                .toList();
     }
 
     @Transactional
@@ -26,8 +32,9 @@ public class SupplierService {
         if (suppliers.existsByNameIgnoreCase(r.name().trim())) {
             throw new BusinessException("Esiste già un fornitore con questo nome");
         }
-        return SupplierDtos.Response.from(
-                suppliers.save(new Supplier(r.name(), r.phone(), r.email(), r.notes())));
+        Long typeId = requireType(r.typeId());
+        Supplier saved = suppliers.save(new Supplier(r.name(), r.phone(), r.email(), r.notes(), typeId));
+        return SupplierDtos.Response.from(saved, lookups.name(LookupType.SUPPLIER_TYPE, typeId));
     }
 
     @Transactional
@@ -36,8 +43,12 @@ public class SupplierService {
         if (suppliers.existsByNameIgnoreCaseAndIdNot(r.name().trim(), id)) {
             throw new BusinessException("Esiste già un fornitore con questo nome");
         }
-        s.update(r.name(), r.phone(), r.email(), r.notes());
-        return SupplierDtos.Response.from(s);
+        Long typeId = r.typeId();
+        if (typeId != null && !typeId.equals(s.getTypeId())) {
+            typeId = requireType(typeId);
+        }
+        s.update(r.name(), r.phone(), r.email(), r.notes(), typeId);
+        return SupplierDtos.Response.from(s, lookups.name(LookupType.SUPPLIER_TYPE, typeId));
     }
 
     /** Se il fornitore è collegato a lotti o ordini, il vincolo del database lo impedisce (HTTP 409). */
@@ -48,5 +59,10 @@ public class SupplierService {
         }
         suppliers.deleteById(id);
         suppliers.flush();
+    }
+
+    private Long requireType(Long typeId) {
+        if (typeId == null) return null;
+        return lookups.requireActive(LookupType.SUPPLIER_TYPE, typeId, "Tipo di fornitore").id();
     }
 }

@@ -22,7 +22,8 @@ class LookupsTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.UNIT[?(@.code == 'KG')].shortLabel").value("kg"))
                 .andExpect(jsonPath("$.VAT_RATE[?(@.code == 'IVA_4')].rate").value(4.0))
                 .andExpect(jsonPath("$.PAYMENT_METHOD[?(@.code == 'CASH')]").isNotEmpty())
-                .andExpect(jsonPath("$.WASTE_REASON[?(@.code == 'SCADUTO')]").isNotEmpty());
+                .andExpect(jsonPath("$.WASTE_REASON[?(@.code == 'SCADUTO')]").isNotEmpty())
+                .andExpect(jsonPath("$.SUPPLIER_TYPE[?(@.code == 'WHOLESALER')]").isNotEmpty());
     }
 
     @Test
@@ -130,6 +131,22 @@ class LookupsTest extends IntegrationTestBase {
                         .content("{\"name\":\"Prodotto fantasma\",\"categoryId\":999999,\"unitId\":"
                                 + lookupId(admin, "UNIT", "KG") + ",\"salePrice\":1,\"vatRateId\":"
                                 + lookupId(admin, "VAT_RATE", "IVA_4") + "}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void supplierTypesAreAssignedAndValidated() throws Exception {
+        String admin = admin();
+        long wholesaler = lookupId(admin, "SUPPLIER_TYPE", "WHOLESALER");
+
+        mvc.perform(post("/api/suppliers").header(AUTH, admin).contentType(JSON)
+                        .content("{\"name\":\"Grossista tipizzato\",\"typeId\":" + wholesaler + "}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.typeId").value(wholesaler))
+                .andExpect(jsonPath("$.type").value("Grossista"));
+
+        mvc.perform(post("/api/suppliers").header(AUTH, admin).contentType(JSON)
+                        .content("{\"name\":\"Fornitore tipo inesistente\",\"typeId\":999999}"))
                 .andExpect(status().isConflict());
     }
 }

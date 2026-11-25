@@ -22,21 +22,25 @@ public class Supplier extends CompanyScopedEntity {
     @Column(length = 120)
     private String email;
 
+    @Column(name = "supplier_type_id")
+    private Long typeId;
+
     @Column(length = 500)
     private String notes;
 
     protected Supplier() {
     }
 
-    public Supplier(String name, String phone, String email, String notes) {
-        update(name, phone, email, notes);
+    public Supplier(String name, String phone, String email, String notes, Long typeId) {
+        update(name, phone, email, notes, typeId);
     }
 
-    public void update(String name, String phone, String email, String notes) {
+    public void update(String name, String phone, String email, String notes, Long typeId) {
         this.name = name.trim();
         this.phone = blankToNull(phone);
         this.email = blankToNull(email);
         this.notes = blankToNull(notes);
+        this.typeId = typeId;
     }
 
     private static String blankToNull(String s) {
@@ -47,5 +51,6 @@ public class Supplier extends CompanyScopedEntity {
     public String getName() { return name; }
     public String getPhone() { return phone; }
     public String getEmail() { return email; }
+    public Long getTypeId() { return typeId; }
     public String getNotes() { return notes; }
 }

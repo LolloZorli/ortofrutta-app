@@ -12,7 +12,8 @@ public enum LookupType {
     ORIGIN("origins", "Origini", false, false),
     WASTE_REASON("waste_reasons", "Motivi di scarto", false, false),
     PAYMENT_METHOD("payment_methods", "Metodi di pagamento", false, false),
-    CUSTOMER_TYPE("customer_types", "Tipi di cliente", false, false);
+    CUSTOMER_TYPE("customer_types", "Tipi di cliente", false, false),
+    SUPPLIER_TYPE("supplier_types", "Tipi di fornitore", false, false);
 
     private final String table;
     private final String label;

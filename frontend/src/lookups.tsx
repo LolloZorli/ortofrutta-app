@@ -11,6 +11,7 @@ const EMPTY: Lookups = {
   WASTE_REASON: [],
   PAYMENT_METHOD: [],
   CUSTOMER_TYPE: [],
+  SUPPLIER_TYPE: [],
 }
 
 interface LookupsState {

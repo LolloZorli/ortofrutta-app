@@ -92,9 +92,13 @@ public class DemoDataLoader implements ApplicationRunner {
         long iva4 = id(LookupType.VAT_RATE, "IVA_4");
         long cash = id(LookupType.PAYMENT_METHOD, "CASH");
         long card = id(LookupType.PAYMENT_METHOD, "CARD");
+        long marketType = id(LookupType.SUPPLIER_TYPE, "MARKET");
+        long producerType = id(LookupType.SUPPLIER_TYPE, "PRODUCER");
 
-        var mercato = suppliers.create(new SupplierDtos.Request("Mercato Ortofrutticolo", "333 1234567", null, "Banco 14, ordini entro le 18"));
-        var azienda = suppliers.create(new SupplierDtos.Request("Azienda Agricola Rossi", "347 7654321", "rossi@example.com", null));
+        var mercato = suppliers.create(new SupplierDtos.Request("Mercato Ortofrutticolo", "333 1234567", null,
+                "Banco 14, ordini entro le 18", marketType));
+        var azienda = suppliers.create(new SupplierDtos.Request("Azienda Agricola Rossi", "347 7654321",
+                "rossi@example.com", null, producerType));
 
         var mele = product("Mele Golden", frutta, kg, "2.20", "10", origin("Trentino"), iva4);
         var banane = product("Banane", frutta, kg, "1.90", "8", origin("Ecuador"), iva4);

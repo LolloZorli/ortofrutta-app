@@ -30,13 +30,19 @@ export default function ContactsPage({ kind }: { kind: Kind }) {
   const cfg = CONFIG[kind]
   const toast = useToast()
   const { can } = useAuth()
+  const { lookups } = useLookups()
   const [editing, setEditing] = useState<Contact | 'new' | null>(null)
   const [history, setHistory] = useState<{ customer: Contact; sales: Sale[] } | null>(null)
+  const [typeFilter, setTypeFilter] = useState('')
   const { data, loading, error, reload } = useLoad<Contact[]>(() => api.get(cfg.path), [kind])
 
   // I permessi decidono cosa si può fare: chi può solo consultare i fornitori non vede i pulsanti di modifica
   const canEdit = kind === 'supplier' ? can('SUPPLIERS_MANAGE') : can('CUSTOMERS_MANAGE') || can('RESERVATIONS_MANAGE')
   const canDelete = kind === 'supplier' ? can('SUPPLIERS_MANAGE') : can('CUSTOMERS_DELETE')
+  const visibleData = kind === 'supplier' && typeFilter
+    ? data?.filter((contact) => String(contact.typeId) === typeFilter)
+    : data
+  const supplierTypes = optionsWithCurrent(lookups.SUPPLIER_TYPE, null)
 
   if (loading && !data) return <Loading />
   if (error || !data) return <ErrorBox message={error ?? 'Nessun dato'} onRetry={reload} />
@@ -64,11 +70,19 @@ export default function ContactsPage({ kind }: { kind: Kind }) {
           + Nuovo {cfg.singular}
         </button>
       )}
-      {data.length === 0 ? (
-        <Empty>{cfg.empty}</Empty>
+      {kind === 'supplier' && data.length > 0 && (
+        <Field label="Filtra per tipo di fornitore">
+          <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+            <option value="">Tutti i tipi</option>
+            {supplierTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+          </select>
+        </Field>
+      )}
+      {visibleData?.length === 0 ? (
+        <Empty>{data.length === 0 ? cfg.empty : 'Nessun fornitore per il tipo selezionato.'}</Empty>
       ) : (
         <div className="list">
-          {data.map((c) => (
+          {visibleData?.map((c) => (
             <div key={c.id} className="card">
               <div className="row between">
                 <div className="item-title">{c.name}</div>
@@ -127,7 +141,8 @@ function ContactForm({ kind, contact, onClose, onSaved }: { kind: Kind; contact:
   const [notes, setNotes] = useState(contact?.notes ?? '')
   const [typeId, setTypeId] = useState<number | ''>(contact?.typeId ?? '')
   const [busy, setBusy] = useState(false)
-  const types = optionsWithCurrent(lookups.CUSTOMER_TYPE, contact?.typeId, contact?.type)
+  const lookupTypes = kind === 'supplier' ? lookups.SUPPLIER_TYPE : lookups.CUSTOMER_TYPE
+  const types = optionsWithCurrent(lookupTypes, contact?.typeId, contact?.type)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -138,7 +153,7 @@ function ContactForm({ kind, contact, onClose, onSaved }: { kind: Kind; contact:
       notes: notes.trim() || null,
     }
     if (kind === 'supplier') body.email = email.trim() || null
-    if (kind === 'customer') body.typeId = typeId === '' ? null : typeId
+    body.typeId = typeId === '' ? null : typeId
     try {
       if (contact) await api.put(`${cfg.path}/${contact.id}`, body)
       else await api.post(cfg.path, body)
@@ -156,18 +171,16 @@ function ContactForm({ kind, contact, onClose, onSaved }: { kind: Kind; contact:
         <Field label="Nome">
           <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
         </Field>
-        {kind === 'customer' && (
-          <Field label="Tipo di cliente (facoltativo)">
-            <select value={typeId} onChange={(e) => setTypeId(e.target.value === '' ? '' : Number(e.target.value))}>
-              <option value="">—</option>
-              {types.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        )}
+        <Field label={kind === 'supplier' ? 'Tipo di fornitore (facoltativo)' : 'Tipo di cliente (facoltativo)'}>
+          <select value={typeId} onChange={(e) => setTypeId(e.target.value === '' ? '' : Number(e.target.value))}>
+            <option value="">—</option>
+            {types.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </Field>
         <Field label="Telefono / WhatsApp">
           <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" />
         </Field>

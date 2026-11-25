@@ -84,6 +84,7 @@ export type LookupTypeName =
   | 'WASTE_REASON'
   | 'PAYMENT_METHOD'
   | 'CUSTOMER_TYPE'
+  | 'SUPPLIER_TYPE'
 
 export interface LookupItem {
   id: number
@@ -133,6 +134,8 @@ export interface Supplier {
   phone: string | null
   email: string | null
   notes: string | null
+  typeId: number | null
+  type: string | null
 }
 
 export interface Customer {
