@@ -10,7 +10,7 @@ spring:
       mail.smtp.auth: ${SPRING_MAIL_AUTH:true}
       mail.smtp.starttls.enable: ${SPRING_MAIL_STARTTLS:true}
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:ortofrutta}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:ortofrutta}?sslmode=${DB_SSLMODE:prefer}
     username: ${DB_USERNAME:ortofrutta}
     password: ${DB_PASSWORD:ortofrutta}
   jpa:
