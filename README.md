@@ -213,6 +213,32 @@ la registrazione autonoma: l'account riceve solo i permessi `CATALOG_READ`, `CUS
 restano in stato **Nuovo** finché il negozio non le conferma. Per ora non è configurata la verifica email:
 un cliente può accedere subito dopo essersi registrato.
 
+## Demo online gratuita per un cliente
+
+Per una prova online temporanea usa `render.demo.yaml`, non `render.yaml` (che crea risorse a pagamento).
+La configurazione pubblica la PWA e l'API sui piani Free di Render e usa PostgreSQL Free di Neon:
+
+1. Pubblica su GitHub il commit con `render.demo.yaml` e le ultime modifiche dell'app.
+2. Crea un progetto PostgreSQL Free su [Neon](https://neon.com/), preferibilmente nella regione europea. Da **Connect**
+   copia host, database, utente e password del ramo principale; conserva la stringa come segreto.
+3. In Render scegli **New → Blueprint**, collega il repository e indica `render.demo.yaml` come percorso del Blueprint.
+   Durante la configurazione inserisci le variabili richieste: `SPRING_DATASOURCE_URL` nel formato
+   `jdbc:postgresql://HOST/DATABASE?sslmode=require` (usa l'host pooled di Neon), `SPRING_DATASOURCE_USERNAME`,
+   `SPRING_DATASOURCE_PASSWORD`, una password robusta per `ADMIN_PASSWORD` e tre password robuste per gli account demo.
+   Render genera `JWT_SECRET`; non inserire credenziali nel repository.
+4. Attendi che il deploy di frontend e backend termini. Invia al cliente l'URL HTTPS del servizio statico
+   `ortofrutta-demo`; per l'accesso di prova condividi l'utente `commesso` e il valore configurato in
+   `DEMO_STAFF_PASSWORD`. Non condividere l'account `admin`.
+
+La demo viene precaricata con dati fittizi al primo avvio. Chi ha accesso all'account demo può modificare o cancellare
+i dati: non usarla per dati personali o operazioni reali. Su Render Free il backend si sospende dopo 15 minuti senza
+traffico e può impiegare circa un minuto a ripartire; Neon Free sospende il database inattivo e ha limiti di risorse.
+Render può sospendere un servizio Free che genera traffico anomalo verso database esterni. Sono servizi di prova,
+senza garanzia di disponibilità; verifica i limiti correnti dei piani prima di invitare il cliente.
+
+Per aggiornare la demo basta pubblicare le modifiche sul branch collegato e attendere i controlli CI. Per azzerare i
+dati, elimina e ricrea il database Neon: il precaricamento demo ripartirà al successivo avvio dell'API.
+
 ## Pubblicare la PWA su Render
 
 Il frontend React è statico e installabile come PWA; per login e dati ha comunque bisogno del backend Spring e di PostgreSQL. Il file `render.yaml` definisce frontend statico, API e database nella regione di Francoforte. Il frontend riceve un URL HTTPS `onrender.com`, quindi il dominio personalizzato è facoltativo.

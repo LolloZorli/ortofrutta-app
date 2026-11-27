@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -54,12 +55,18 @@ public class DemoDataLoader implements ApplicationRunner {
     private final SaleService sales;
     private final CustomerOrderService customerOrders;
     private final LookupService lookups;
+    private final String staffPassword;
+    private final String managerPassword;
+    private final String warehousePassword;
 
     public DemoDataLoader(UserRepository users, CompanyMembershipRepository memberships, RoleRepository roles, PasswordEncoder encoder,
                           ProductRepository productRepository, ProductService products,
                           SupplierService suppliers, CustomerService customers,
                           StockService stock, SaleService sales, CustomerOrderService customerOrders,
-                          LookupService lookups) {
+                          LookupService lookups,
+                          @Value("${app.demo.staff-password}") String staffPassword,
+                          @Value("${app.demo.manager-password}") String managerPassword,
+                          @Value("${app.demo.warehouse-password}") String warehousePassword) {
         this.users = users;
         this.memberships = memberships;
         this.roles = roles;
@@ -72,13 +79,16 @@ public class DemoDataLoader implements ApplicationRunner {
         this.sales = sales;
         this.customerOrders = customerOrders;
         this.lookups = lookups;
+        this.staffPassword = staffPassword;
+        this.managerPassword = managerPassword;
+        this.warehousePassword = warehousePassword;
     }
 
     @Override
     public void run(ApplicationArguments args) {
-        demoUser("commesso", "commesso123", "STAFF");
-        demoUser("responsabile", "responsabile123", "MANAGER");
-        demoUser("magazziniere", "magazziniere123", "WAREHOUSE");
+        demoUser("commesso", staffPassword, "STAFF");
+        demoUser("responsabile", managerPassword, "MANAGER");
+        demoUser("magazziniere", warehousePassword, "WAREHOUSE");
 
         if (productRepository.count() > 0) {
             return;

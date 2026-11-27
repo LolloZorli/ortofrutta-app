@@ -1,0 +1,58 @@
+services:
+  - type: web
+    name: ortofrutta-demo-api
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    plan: free
+    region: frankfurt
+    healthCheckPath: /actuator/health/readiness
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: demo
+      - key: JAVA_TOOL_OPTIONS
+        value: -XX:MaxRAMPercentage=55
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_MUST_CHANGE_PASSWORD
+        value: "true"
+      - key: DEMO_STAFF_PASSWORD
+        sync: false
+      - key: DEMO_MANAGER_PASSWORD
+        sync: false
+      - key: DEMO_WAREHOUSE_PASSWORD
+        sync: false
+      - key: APP_CORS_ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: ortofrutta-demo
+          property: url
+
+  - type: web
+    name: ortofrutta-demo
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    autoDeployTrigger: checksPass
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: ortofrutta-demo-api
+          property: url

@@ -64,3 +64,7 @@ app:
     password: ${ADMIN_PASSWORD:admin123}
     # Se true, al primo accesso l'amministratore deve scegliere una nuova password
     must-change-password: ${ADMIN_MUST_CHANGE_PASSWORD:true}
+  demo:
+    staff-password: ${DEMO_STAFF_PASSWORD:commesso123}
+    manager-password: ${DEMO_MANAGER_PASSWORD:responsabile123}
+    warehouse-password: ${DEMO_WAREHOUSE_PASSWORD:magazziniere123}
