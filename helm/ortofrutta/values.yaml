@@ -5,13 +5,13 @@ database:
   image: postgres:16
 
 backend:
-  image: ghcr.io/lollozorli/ortofrutta-app-backend
+  image: ghcr.io/lollozorli/ortofrutta-backend
   tag: latest
   replicas: 1
   servicePort: 8080
 
 frontend:
-  image: ghcr.io/lollozorli/ortofrutta-app-frontend
+  image: ghcr.io/lollozorli/ortofrutta-frontend
   tag: latest
   replicas: 1
   servicePort: 80

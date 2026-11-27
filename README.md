@@ -1,320 +1,151 @@
 # Ortofrutta
 
-Piattaforma multi-azienda per ortofrutta: ogni negozio gestisce **cassa**, **magazzino a lotti**, **scarti**, **margini reali**,
-**ordini ai fornitori** (anche via WhatsApp), **prenotazioni dei clienti**, **corrispettivi giornalieri** e **registro delle attività**.
-Interfaccia pensata per il telefono, da usare con una mano dietro al banco.
+Gestionale web multi-azienda per negozi di frutta e verdura. Riunisce vendite, magazzino, ordini e clienti in un'interfaccia mobile-first, installabile come PWA.
 
-> Progetto full-stack + DevOps: Spring Boot, React, PostgreSQL, Docker, CI/CD, Kubernetes.
+## Funzionalità
 
-## Cosa fa
+- **Cassa e vendite**: ricerca prodotti e codici a barre, pagamenti, clienti, storni e chiusura contanti.
+- **Magazzino**: lotti con costo e scadenza, consumo FIFO, carichi, inventario, scarti e storico movimenti.
+- **Ordini**: acquisti dai fornitori e prenotazioni dei clienti, con ritiro o consegna a domicilio.
+- **Gestione**: anagrafiche, report, cartellini prezzo, ruoli e permessi configurabili, registro attività.
+- **Portale clienti**: registrazione, catalogo e consultazione dei propri ordini.
+- **Multi-azienda**: dati e permessi isolati per negozio.
 
-| Area | Funzioni |
+Le aliquote IVA e altre tipologiche sono configurabili dall'amministratore. Verifica le aliquote con il commercialista prima di usare dati reali: la migrazione iniziale assegna il 4% ai prodotti esistenti.
+
+## Tecnologie
+
+| Componente | Stack |
 |---|---|
-| **Cassa** | Carrello con più prodotti, ricerca per nome o codice a barre, lettore USB/Bluetooth e scansione fotocamera nei browser compatibili, cliente facoltativo, metodo di pagamento, incasso atomico e **storno** con ripristino della merce |
-| **Magazzino** | Giacenze, conteggio fisico con rettifica tracciata, lotti con scadenza, carico merce, scarti con motivo, storico movimenti paginato con l'operatore |
-| **Lotti FIFO** | Ogni arrivo è un lotto con costo e scadenza; le vendite consumano prima il più vecchio, così il margine è reale |
-| **Ordini fornitori** | Bozza, invio (link WhatsApp), arrivo merce con correzione di quantità/costo; precompilazione dai prodotti sotto scorta |
-| **Ordini clienti** | Ritiro in negozio o consegna a domicilio con zona, tariffa e capienza per fascia/data configurabili. Nuovo → In preparazione → Ritirato/Consegnato. Il completamento crea la vendita e scarica il magazzino |
-| **Corrispettivi** | Riepilogo giornaliero per aliquota IVA (imponibile e imposta scorporati) e per metodo di pagamento; chiusura contanti con differenza tra atteso e contato |
-| **Clienti** | Anagrafica e storico acquisti associati alle vendite |
-| **Portale clienti** | Registrazione con email e password, catalogo senza giacenze interne, invio e consultazione dei propri ordini |
-| **Cartellini** | Stampa dei cartellini prezzo dei prodotti attivi e filtrati |
-| **Report** | Incasso, valore magazzino, margine, scarti, più venduti, lotti in scadenza, report per prodotto |
-| **Tipologiche** | Categorie, unità di misura, aliquote IVA, origini, motivi di scarto, metodi di pagamento, tipi di cliente e fornitore: **solo l'admin le gestisce** |
-| **Ruoli e permessi** | Ruoli e permessi indipendenti per ogni azienda; 4 ruoli operativi e il ruolo Cliente |
-| **Registro attività** | Chi ha cambiato prezzi, utenti, ruoli, tipologiche, chi ha stornato una vendita |
-
-## Tipologiche (tabelle di decodifica)
-
-Valori "statici" che compaiono nei moduli e che solo chi ha il permesso `LOOKUPS_MANAGE` (l'amministratore) può aggiungere o modificare.
-Ognuna è una tabella a sé, con chiavi esterne dai dati che la usano.
-
-| Tipologica | Usata da | Note |
-|---|---|---|
-| Categorie prodotto | prodotti | Frutta, Verdura, Erbe aromatiche... |
-| **Unità di misura** | prodotti, quantità ovunque | etichetta breve (kg, pz, mazzo) e **se ammette decimali**: i pezzi si vendono solo interi |
-| **Aliquote IVA** | prodotti, corrispettivi | percentuale; l'aliquota si "congela" su ogni vendita, quindi cambiarla non altera il passato |
-| Origini | prodotti | facoltativa |
-| Motivi di scarto | scarti | si sceglie da elenco, non testo libero: i report degli scarti diventano confrontabili |
-| Metodi di pagamento | cassa, prenotazioni, corrispettivi | |
-| Tipi di cliente | clienti | facoltativo |
-| Tipi di fornitore | fornitori | azienda agricola/produttore, grossista, mercato, cooperativa, importatore; filtrabili nell'anagrafica. Quelli già presenti vengono classificati come "Altro" dalla migrazione |
-
-- I valori **non si cancellano** (i dati storici li usano): si **disattivano**, e non si possono più assegnare ai nuovi dati.
-- Gli **stati dei flussi** (bozza/inviato/ricevuto, nuova/pronta/ritirata) *non* sono tipologiche: la logica del codice dipende da loro.
-- Le tipologiche sono tenute in una **cache in memoria** (si rinnova ogni 60 s e dopo ogni modifica; un id sconosciuto forza una rilettura, quindi con più repliche un valore nuovo è usabile subito).
-
-> Le aliquote IVA iniziali (4%, 5%, 10%, 22%) sono valori d'esempio. La migrazione assegna **4%** a tutti i prodotti già presenti
-> (tipica per l'ortofrutta fresca): **fai verificare le aliquote dal commercialista** prodotto per prodotto.
-
-## Utenti, ruoli e permessi
-
-I permessi sono un elenco fisso nel codice (ogni permesso = una funzione); i **ruoli** sono dati nel database e li definisce l'amministratore.
-
-| Ruolo (pronto all'uso) | Cosa fa |
-|---|---|
-| **Amministratore** | Tutto, sempre. Ha la gestione completa di utenti, ruoli e tipologiche. Non modificabile |
-| **Responsabile** | Gestisce il negozio: prodotti e prezzi, cassa, storni, carico, ordini, costi, report, registro; consulta commessi e clienti e approva le richieste staff. Non gestisce ruoli/tipologiche |
-| **Cassiere** | Vende (a prezzo di listino), consulta i fornitori e crea ordini ai fornitori; registra scarti, clienti e prenotazioni. Non vede costi e margini |
-| **Magazziniere** | Riceve la merce e gestisce gli ordini. Non usa la cassa |
-| **Cliente** | Si registra con email e password, consulta il catalogo e crea/consulta solo i propri ordini |
-
-Dall'app (*Altro → Ruoli e permessi*) puoi creare altri ruoli scegliendo i permessi. I permessi di amministrazione
-(`USERS_MANAGE`, `ROLES_MANAGE`, `LOOKUPS_MANAGE`) **non sono assegnabili** ad altri ruoli. Alcuni permessi ne richiedono altri
-(chi vende deve poter vedere il listino) e vengono aggiunti da soli.
-
-- I permessi sono imposti dal **backend** (`SecurityConfig`, una sola matrice): nascondere un pulsante non basta, una chiamata non permessa risponde 403.
-- Il token contiene solo il nome utente: **ruolo e permessi si rileggono dal database a ogni richiesta** (una query sola).
-  Un utente disattivato o con permessi cambiati li perde subito.
-- Chi non ha `COSTS_VIEW` non riceve mai costi di acquisto né margini; chi non ha `SALES_PRICE_OVERRIDE` vende sempre a listino.
-- **Password temporanee**: finché l'utente non ne sceglie una sua, il server non gli concede nessun permesso. Vale anche per il primo accesso dell'admin.
-- Un amministratore non può cambiare il proprio ruolo o disattivarsi.
-
-## Aziende e isolamento dei dati
-
-Ogni ortofrutta può registrarsi dalla schermata di accesso. Ogni azienda ha un catalogo, fornitori, clienti,
-ruoli, utenti, magazzino, vendite e ordini separati. L'API seleziona l'azienda con l'header `X-Company-Slug`;
-il frontend lo imposta quando si sceglie il negozio. I token vengono verificati contro l'iscrizione dell'utente
-a quell'azienda, e permessi e record vengono riletti nel contesto dell'azienda per ogni richiesta.
-
-L'identità di accesso del cliente è condivisa: per aggiungere un altro negozio allo stesso account, seleziona
-quel negozio, scegli la registrazione cliente e inserisci la stessa email e password. Verrà creato un profilo
-cliente distinto per l'azienda; ordini e dati personali di negozi diversi restano separati. I dati già presenti
-nel database vengono migrati nell'azienda `ortofrutta` senza cancellarli.
-
-La schermata iniziale offre quattro ingressi: accedi, registrazione cliente, richiesta di accesso come commesso e
-registrazione azienda. Il commesso seleziona il negozio e crea l'account; il responsabile approva la richiesta da
-**Altro → Commessi e richieste di accesso** prima che l'account possa entrare nel gestionale. Il cliente sceglie
-un negozio dall'elenco e può cambiare negozio dal pulsante in alto; il logout è disponibile per tutti i ruoli.
-
-Nel portale ordini il cliente sceglie tra ritiro e consegna a domicilio. Per la consegna inserisce indirizzo,
-città, CAP e telefono, e sceglie una fascia oraria disponibile. In **Altro → Zone e fasce di consegna** il
-responsabile delle prenotazioni configura le città servite (corrispondenza senza distinzione tra maiuscole e
-minuscole), costo, minimo d'ordine e capienza massima per fascia e data. Il costo si aggiunge al totale e alla
-vendita quando il negozio registra la consegna; tariffa e fascia restano salvate sull'ordine anche se la
-configurazione viene modificata in seguito. Il ritiro in negozio mantiene il comportamento solo-data.
-
-## Efficienza
-
-- **Cache delle tipologiche**: niente join né query ripetute per nomi, unità e aliquote.
-- **Liste paginate** (movimenti, ordini, vendite, registro): il client chiede una pagina alla volta.
-- **Niente query N+1**: i dati collegati si caricano insieme (`@EntityGraph`) o a blocchi (batch fetch).
-- **Dashboard in meno query**: tutti gli importi in un'unica scansione dei movimenti.
-- **Vendita atomica**: più righe in una sola transazione, con blocco sui lotti per evitare vendite concorrenti.
-- **Compressione HTTP** (backend e nginx) e **frontend a pezzi**: ogni pagina si scarica solo quando serve (il codice di amministrazione non arriva al commesso).
-- Indici sulle nuove query (vendite, movimenti per vendita, registro).
-
-## Architettura
+| Backend | Java 21, Spring Boot 3.5, Spring Security, JPA, Flyway |
+| Frontend | React 18, TypeScript, Vite |
+| Database | PostgreSQL 16 |
+| Container e deploy | Docker Compose, GHCR, Render; chart Helm disponibile |
 
 ```mermaid
 flowchart LR
-  U[Telefono / browser] --> N[nginx + React]
-  N -->|/api| B[Spring Boot API]
+  U[Browser / PWA] --> F[React + nginx]
+  F -->|/api| B[Spring Boot API]
   B --> D[(PostgreSQL)]
-  B -. Flyway .-> D
 ```
 
-- **backend/**: Spring Boot 3.5, Java 21, Spring Data JPA, Spring Security (JWT), Flyway, springdoc-openapi, JdbcClient per i report
-- **frontend/**: React 18, TypeScript, Vite, React Router (CSS proprio, mobile-first)
-- **docker-compose.yml**: database e (con il profilo `app`) backend e frontend
+## Avvio in locale
 
-Il backend è organizzato **per funzionalità** (`product`, `stock`, `sale`, `lookup`, `auth`, `report`, `audit`...).
+Prerequisiti: Git, Docker con Docker Compose, Java 21 e Maven per lo sviluppo backend, Node.js 22 per il frontend.
 
-## Avvio
+### Avvio completo con Docker
 
-### 1. Sviluppo: database in Docker, backend e frontend in locale
+Dalla radice del repository:
 
 ```bash
-docker compose up -d                 # solo PostgreSQL
+docker compose --profile app up --build -d
 ```
 
-**Backend** (IntelliJ): apri `backend/pom.xml`, JDK 21, lancia `OrtofruttaApplication`.
-Per i dati di prova aggiungi `SPRING_PROFILES_ACTIVE=demo`.
+Apri <http://localhost:3000>. L'API è disponibile su <http://localhost:8081>; PostgreSQL sulla porta `5433` dell'host. Il database nel container è raggiungibile dagli altri servizi come `db:5432`.
 
-**Frontend** (Node 20.19+ o 22):
-```bash
-cd frontend && npm install && npm run dev      # http://localhost:5173
-```
-
-Accesso iniziale: `admin` / `admin123`: al primo accesso l'app chiede di scegliere una nuova password.
-Con il profilo `demo` esistono anche `commesso` / `commesso123`, `responsabile` / `responsabile123`, `magazziniere` / `magazziniere123`.
-
-### 2. Tutto in container
+In ambiente locale Compose usa dati demo e credenziali predefinite (`admin` / `admin123`); al primo accesso l'amministratore deve cambiare password. **Non usare queste credenziali, i dati demo o il secret JWT predefinito in produzione.** Per fermare i servizi senza cancellare i dati:
 
 ```bash
-docker compose --profile app up --build -d     # builda i sorgenti locali e avvia l'app
+docker compose --profile app down
 ```
 
-PostgreSQL è raggiungibile dal PC su `localhost:5433`; i container si collegano invece al servizio Docker
-`db:5432`. La porta `5432` del PC è già occupata e non può essere pubblicata da Docker.
-Le richieste del frontend passano da nginx (`/api`) e restano sullo stesso origin: nginx non inoltra
-l'header `Origin` al backend. `APP_CORS_ALLOWED_ORIGINS` in Compose autorizza comunque `http://localhost:3000`
-se si interroga direttamente l'API dalla porta `8081`.
-
-Per vedere i log: `docker compose --profile app logs -f backend frontend`. Per fermare i container:
-`docker compose --profile app down`; il database resta nel volume locale. Per cancellare anche i dati demo:
-`docker compose --profile app down -v`. Questo ambiente usa i sorgenti presenti sul PC: non caricare dati reali.
-
-### Installare l'app sul telefono
-
-Il frontend è una **PWA**: non serve scaricare un APK né pubblicarla su uno store. Apri l'indirizzo
-HTTPS dell'app dal telefono, poi usa **Installa app** nel menu di Chrome/Android oppure, su iPhone,
-**Condividi → Aggiungi alla schermata Home**. In *Altro* trovi il pulsante d'installazione quando il
-browser lo supporta. Il browser richiede HTTPS per installare; `localhost` vale solo sul dispositivo
-che esegue il browser, quindi per il telefono serve un indirizzo HTTPS raggiungibile dal telefono.
-L'interfaccia può aprirsi dalla cache, ma accesso, vendite e dati richiedono il backend raggiungibile.
-
-## Flusso collaudo → produzione
-
-Gli ambienti sono separati: **collaudo** gira sul tuo PC con Docker e usa il branch GitHub `collaudo`;
-**produzione** gira su Render, collegato a Neon e al branch `master`.
-
-1. Crea una sola volta il branch remoto `collaudo` da `master`: `git switch -c collaudo`, poi `git push -u origin collaudo`.
-2. Sviluppa sul branch `collaudo`. Per provare la versione locale esegui `docker compose --profile app up --build -d`.
-   Ogni push a `collaudo` avvia anche GitHub Actions: test backend con PostgreSQL/Testcontainers, build frontend
-   e controlli di sicurezza. La CI verifica il codice nel runner GitHub, non avvia né aggiorna i container sul tuo PC.
-3. Quando le prove locali e i controlli Actions sono verdi, apri una pull request `collaudo` → `master`.
-   Dopo revisione e merge, la CI riparte su `master`; solo `master` pubblica le immagini GHCR e aggiorna la produzione Render.
-4. Se la versione non supera il collaudo, continua a lavorare su `collaudo`: non fare merge e Render non cambia.
-
-Non mettere password o URL database nei commit. Collaudo usa il PostgreSQL locale di Compose e dati demo; produzione usa
-un database Neon distinto, credenziali/JWT distinti e il profilo `prod`.
-
-Per impedire che una modifica salti il collaudo, in GitHub crea una ruleset o una branch protection per `master`:
-richiedi pull request e i controlli obbligatori `backend`, `frontend` e `security`; disabilita il push diretto.
-Render deve essere collegato solo a `master`, come nel Blueprint.
-
-Le immagini pubblicate su GHCR rimangono disponibili con tag commit e `latest` per eventuali deploy futuri.
-I manifest Kubernetes in `k8s/app.yaml` e `helm/ortofrutta` sono separati dal flusso Render descritto qui e non vengono
-aggiornati da questo workflow.
-
-Le migrazioni **V3–V7** aggiungono tipologiche e funzionalità senza cancellare i dati esistenti: V4 aggiunge
-il codice a barre, V5 collega le vendite ai clienti, introduce la chiusura contanti e le rettifiche inventario,
-V6 aggiunge gli account email dei clienti e V7 aggiorna la descrizione del ruolo Responsabile.
-**V8** introduce il modello multi-azienda e assegna i dati esistenti allo shop `ortofrutta`; **V9** aggiunge
-ritiro/consegna agli ordini clienti; **V10** aggiunge l'approvazione delle richieste staff e i permessi
-aggiuntivi di responsabile e commesso; **V11** aggiunge gli indici per il catalogo clienti e la disponibilità.
-**V12** aggiunge i token monouso per il reset password; **V13** aggiunge zone, tariffe e fasce di consegna configurabili;
-**V14** aggiunge la classificazione dei fornitori.
-Prima di aggiornare un database già usato, fai un backup. Flyway applica le migrazioni all'avvio del backend.
-Verifica le aliquote IVA prima di usare dati reali.
-
-Gli account dipendenti si creano da **Altro → Utenti** con password temporanea e ruolo; l'email è facoltativa
-per gli utenti esistenti e diventa un metodo di accesso aggiuntivo. Il portale clienti permette invece
-la registrazione autonoma: l'account riceve solo i permessi `CATALOG_READ`, `CUSTOMER_ORDER_CREATE` e
-`CUSTOMER_ORDER_READ`, e il backend associa ogni ordine al cliente autenticato. Le richieste dei clienti
-restano in stato **Nuovo** finché il negozio non le conferma. Per ora non è configurata la verifica email:
-un cliente può accedere subito dopo essersi registrato.
-
-## Pubblicare la PWA su Render
-
-Il frontend React è statico e installabile come PWA; per login e dati ha bisogno del backend Spring e di PostgreSQL.
-Il file `render.yaml` definisce frontend statico e API; entrambi sono collegati esplicitamente al branch `master`.
-Render usa Neon come database esterno, quindi il Blueprint non crea né condivide un database Render.
-
-1. Crea un account Render e collega il repository GitHub.
-2. Da Render scegli **New → Blueprint**, seleziona questo repository e conferma `render.yaml`.
-3. Crea un progetto PostgreSQL su [Neon](https://neon.com/) nella regione più vicina a Render e copia le credenziali di connessione. Per produzione configura piano, backup e limiti di Neon adeguati all'uso: non considerare il piano gratuito una garanzia di disponibilità o backup.
-4. In Render configura le variabili richieste dal Blueprint: `SPRING_DATASOURCE_URL` nel formato
-   `jdbc:postgresql://HOST/DATABASE?sslmode=require` (preferibilmente l'endpoint pooled Neon), `SPRING_DATASOURCE_USERNAME`,
-   `SPRING_DATASOURCE_PASSWORD` e una password robusta per `ADMIN_PASSWORD`. Render genera `JWT_SECRET`.
-   Non usare credenziali o database di collaudo.
-5. Attendi il deploy e apri l'URL HTTPS del frontend. Il deploy automatico segue i controlli GitHub Actions sul branch `master`.
-   Accedi come `admin` e cambia la password iniziale.
-
-Le migrazioni Flyway aggiornano lo schema Neon all'avvio dell'API. Prima di ogni aggiornamento produzione verifica i backup
-e le migrazioni; il frontend e il backend ricevono URL pubblici distinti solo per l'API, mentre il database non va esposto
-pubblicamente.
-Se hai già un database Render con dati, non scollegarlo o cancellarlo durante la sincronizzazione del Blueprint: prima
-esporta i dati, importali in Neon e verifica la connessione; conserva il backup prima di rimuovere il database precedente.
-
-Per installarla sul telefono apri l'URL HTTPS: su Android usa **Installa app** nel menu di Chrome; su iPhone usa **Condividi → Aggiungi alla schermata Home**. La PWA conserva la shell dell'interfaccia, ma le vendite e gli altri dati richiedono la connessione al backend.
-
-## Test locali
+Per eliminare anche il volume PostgreSQL locale:
 
 ```bash
-cd backend && mvn verify             # serve Docker acceso (Testcontainers)
-cd frontend && npm run build         # controllo dei tipi + build
+docker compose --profile app down -v
 ```
 
-Su Windows è necessario avere JDK 21 e Maven nel `PATH`, oppure usare il Maven integrato in IntelliJ.
-Prima di eseguire i test Docker, avvia Docker Desktop e verifica con `docker info`.
-In questa configurazione i test backend che richiedono PostgreSQL usano Testcontainers; quindi non bastano
-solo JDK e Maven.
+### Sviluppo con servizi separati
 
-Per eseguire rapidamente i due test backend indipendenti da Docker:
+Avvia il database:
 
 ```bash
-cd backend
-mvn -Dtest=StockServiceTest,LookupSlugTest test
+docker compose up -d db
 ```
 
-Se Testcontainers segnala che l'API Docker `1.32` è troppo vecchia, imposta
-`JAVA_TOOL_OPTIONS=-Dapi.version=1.44` prima di eseguire Maven. La CI backend usa già questo override.
+Poi, in due terminali:
 
-- `StockServiceTest`: logica FIFO, IVA congelata, quantità intere per le unità senza decimali (nessun database)
-- `LookupSlugTest`: generazione dei codici delle tipologiche
-- `ApiFlowTest`: carico, vendita, scarto, atomicità della vendita, paginazione
-- `RolesTest`: permessi dei ruoli operativi e Cliente, registrazione cliente, ruoli personalizzati, permessi riservati, password temporanee, utenti disattivati
-- `LookupsTest`: solo l'admin crea tipologiche, duplicati, valori disattivati, regole su unità e IVA, tipo fornitore
-- `SalesTest`: carrello, storno, corrispettivi per IVA (con vendite stornate escluse), ritiro prenotazioni, vendite visibili solo al proprio autore
-- `CustomerPortalTest`: catalogo senza costi o giacenze, ordine al prezzo di listino, consegna a domicilio con tariffa/capienza, completamento con vendita e visibilità limitata ai propri ordini
-- `CompanyIsolationTest`: registrazione aziende, utenti e ruoli separati, cataloghi e ordini isolati, account cliente condiviso fra negozi
-- `EmployeeRegistrationTest`: richiesta commesso, accesso bloccato prima dell'approvazione e attivazione da parte del responsabile
+```bash
+mvn -f backend/pom.xml spring-boot:run
+```
 
-I test di integrazione condividono **un solo PostgreSQL** (Testcontainers) e un solo contesto Spring.
+```bash
+npm --prefix frontend ci
+npm --prefix frontend run dev
+```
 
-## Configurazione
+Il frontend di sviluppo è disponibile su <http://localhost:5173>. Per caricare dati demo nel backend imposta `SPRING_PROFILES_ACTIVE=demo`. L'admin locale predefinito è `admin` / `admin123`.
 
-| Variabile | Significato | Default (solo sviluppo) |
-|---|---|---|
-| `JWT_SECRET` | Chiave di firma dei token, min. 32 caratteri | valore fisso di sviluppo |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Amministratore creato al primo avvio | `admin` / `admin123` |
-| `ADMIN_MUST_CHANGE_PASSWORD` | Obbliga a cambiare la password al primo accesso | `true` |
-| `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` | Database | `localhost:5433/ortofrutta` dal PC; `db:5432/ortofrutta` nei container |
-| `X-Company-Slug` | Azienda selezionata per le API | `ortofrutta` |
-| `SPRING_PROFILES_ACTIVE=demo` | Carica dati di prova | disattivo |
+## Test e controlli
 
-## Funzioni di produzione
+```bash
+mvn -B -f backend/pom.xml verify
+npm --prefix frontend ci
+npm --prefix frontend run build
+helm lint helm/ortofrutta
+```
 
-- Dalla pagina **Report** è possibile esportare i dati prodotti in CSV e stampare il prospetto.
-- La schermata di accesso supporta la richiesta di reset password. Il token è casuale, salvato solo come hash,
-  ha durata configurabile e viene invalidato dopo l'uso o una nuova richiesta.
-- Gli avvisi automatici possono segnalare via email prodotti sotto scorta e lotti in scadenza.
-- Il backend espone `/actuator/prometheus` per Prometheus e contiene annotazioni Helm per lo scraping.
+I test backend di integrazione usano Testcontainers: Docker deve essere avviato. La build frontend esegue il controllo TypeScript e la build di produzione.
 
-| Variabile notifiche/reset | Significato |
+## CI e immagini Docker
+
+GitHub Actions esegue la pipeline sui push a `collaudo` e `master` e sulle pull request:
+
+1. test e verifica backend con Maven;
+2. controllo TypeScript e build frontend;
+3. scansione segreti con Gitleaks, lint Helm e scansione vulnerabilità con Trivy.
+
+Solo un push su `master`, dopo il completamento dei controlli, pubblica le immagini su GitHub Container Registry (GHCR):
+
+| Componente | Immagine |
 |---|---|
-| `SPRING_MAIL_HOST/PORT/USERNAME/PASSWORD` | Server SMTP per reset password e avvisi |
-| `SPRING_MAIL_AUTH/STARTTLS` | Configurazione autenticazione SMTP |
-| `PASSWORD_RESET_BASE_URL` | URL pubblico del frontend da inserire nel link di reset |
-| `PASSWORD_RESET_TOKEN_TTL` | Durata del token reset, default `30m` |
-| `NOTIFICATION_RECIPIENT_EMAILS` | Elenco email separate da virgola |
-| `NOTIFICATION_CRON` | Programmazione avvisi, default 08:00 Europe/Rome |
+| API | `ghcr.io/lollozorli/ortofrutta-backend` |
+| Frontend | `ghcr.io/lollozorli/ortofrutta-frontend` |
 
-Il deploy Kubernetes può usare anche il chart in `helm/ortofrutta`:
+Ogni immagine viene pubblicata con un tag corrispondente allo SHA del commit e con il tag mobile `latest`. Per deploy riproducibili, preferisci il tag SHA. I vecchi package `ortofrutta-app-backend` e `ortofrutta-app-frontend` eventualmente presenti su GHCR non vengono rimossi automaticamente.
+
+## Collaudo e produzione
+
+- **Collaudo**: lavora e verifica le modifiche sul branch `collaudo`. Il push esegue la CI, ma non pubblica immagini né aggiorna Render.
+- **Produzione**: apri una pull request da `collaudo` a `master`. Il merge fa ripartire i controlli; dopo il successo, il workflow pubblica le immagini e Render può distribuire il commit di `master`.
+
+Il file `render.yaml` definisce un frontend statico e un backend Docker; il database di produzione è esterno (Neon). Configura in Render le credenziali del database (`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`) e `ADMIN_PASSWORD`. Render genera `JWT_SECRET`. Usa un secret JWT casuale di almeno 32 caratteri e non riutilizzare credenziali o database di collaudo.
+
+Prima di collegare un database già in uso o applicare migrazioni, fai un backup. Flyway aggiorna lo schema all'avvio del backend. La PWA richiede HTTPS per l'installazione e una connessione al backend per autenticazione e dati.
+
+## Deploy Kubernetes (opzionale)
+
+Il chart Helm è separato dal deploy Render e non viene installato dalla CI. Configura prima i secret previsti dai valori del chart (`ortofrutta-config` e `ghcr-pull-secret`), quindi:
 
 ```bash
 helm lint helm/ortofrutta
 helm upgrade --install ortofrutta helm/ortofrutta \
   --namespace ortofrutta --create-namespace \
-  --set backend.tag=<commit-sha> --set frontend.tag=<commit-sha>
+  --set backend.tag=<commit-sha> \
+  --set frontend.tag=<commit-sha>
 ```
 
-La CI esegue Gitleaks, Trivy, lint Helm e la build backend/frontend prima della pubblicazione delle immagini.
+I repository predefiniti del chart sono `ghcr.io/lollozorli/ortofrutta-backend` e `ghcr.io/lollozorli/ortofrutta-frontend`.
 
-## Limiti noti
+## Configurazione
 
-- Non sostituisce il registratore di cassa: i **corrispettivi** dell'app sono un prospetto interno, non la trasmissione fiscale.
-- Il token resta valido fino a scadenza (8 ore) ma ogni richiesta ricontrolla l'utente; manca un "esci da tutti i dispositivi".
-- I dati personali dei clienti richiedono informativa e misure GDPR per un uso commerciale.
+| Variabile | Uso |
+|---|---|
+| `SPRING_DATASOURCE_URL` | URL JDBC PostgreSQL; in Compose è configurato per `db:5432` |
+| `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` | Credenziali database |
+| `JWT_SECRET` | Chiave di firma JWT; usa un valore casuale e privato in produzione |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Credenziali iniziali, applicate quando il database non contiene utenti |
+| `ADMIN_MUST_CHANGE_PASSWORD` | Richiede il cambio della password iniziale |
+| `SPRING_PROFILES_ACTIVE` | Attiva profili applicativi come `demo` o `prod` |
+| `APP_CORS_ALLOWED_ORIGINS` | Origini abilitate per le richieste cross-origin |
+| `PASSWORD_RESET_BASE_URL`, `PASSWORD_RESET_TOKEN_TTL` | URL pubblico e durata dei token di reset password |
+| `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` | Configurazione SMTP |
+| `NOTIFICATION_RECIPIENT_EMAILS`, `NOTIFICATION_CRON` | Destinatari e orario delle notifiche |
 
-## Roadmap DevOps
+Non inserire password, token o URL con credenziali nei commit. Configura i valori sensibili come secret nell'ambiente di deploy.
 
-- [x] Dockerfile multi-stage, utente non root, CI base con GitHub Actions
-- [x] CI su `collaudo` e `master`, con test backend, build frontend, Gitleaks e Trivy
-- [x] Pubblicazione immagini GHCR su `master` e deploy produzione su Render con database Neon
-- [x] Helm chart disponibile per deploy Kubernetes manuale
-- [ ] SAST aggiuntivo (Semgrep/SonarQube)
-- [ ] Prometheus e Grafana
-- [ ] Terraform + AWS
+## Note
+
+- L'app non sostituisce un registratore di cassa fiscale: i corrispettivi sono un prospetto gestionale interno.
+- Per un uso commerciale, configura informativa e misure adeguate alla protezione dei dati personali.
+- La documentazione tecnica delle API è esposta dal backend tramite Swagger UI su `/swagger-ui.html`.
