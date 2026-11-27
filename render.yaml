@@ -3,6 +3,7 @@ services:
   - type: web
     name: ortofrutta-frontend
     runtime: static
+    branch: master
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
@@ -22,6 +23,7 @@ services:
   - type: web
     name: ortofrutta-backend
     runtime: docker
+    branch: master
     dockerfilePath: backend/Dockerfile
     dockerContext: backend
     plan: 1c-2g
@@ -39,37 +41,14 @@ services:
         sync: false
       - key: ADMIN_MUST_CHANGE_PASSWORD
         value: "true"
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
       - key: APP_CORS_ALLOWED_ORIGINS
         fromService:
           type: web
           name: ortofrutta-frontend
           property: url
-      - key: DB_HOST
-        fromDatabase:
-          name: ortofrutta-db
-          property: host
-      - key: DB_PORT
-        fromDatabase:
-          name: ortofrutta-db
-          property: port
-      - key: DB_NAME
-        fromDatabase:
-          name: ortofrutta-db
-          property: database
-      - key: DB_USERNAME
-        fromDatabase:
-          name: ortofrutta-db
-          property: user
-      - key: DB_PASSWORD
-        fromDatabase:
-          name: ortofrutta-db
-          property: password
-
-databases:
-  - name: ortofrutta-db
-    databaseName: ortofrutta
-    user: ortofrutta
-    plan: basic-1gb
-    region: frankfurt
-    postgresMajorVersion: "16"
-    diskSizeGB: 1

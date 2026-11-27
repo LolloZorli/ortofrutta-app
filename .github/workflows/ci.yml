@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [collaudo, master]
   pull_request:
 
 permissions:

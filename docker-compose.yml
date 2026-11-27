@@ -18,8 +18,8 @@ services:
 
   backend:
     profiles: [app]
-    image: ghcr.io/lollozorli/ortofrutta-app-backend:${APP_IMAGE_TAG:-latest}
-    pull_policy: always
+    build:
+      context: ./backend
     container_name: ortofrutta-backend
     ports:
       - "8081:8080"
@@ -37,8 +37,8 @@ services:
 
   frontend:
     profiles: [app]
-    image: ghcr.io/lollozorli/ortofrutta-app-frontend:${APP_IMAGE_TAG:-latest}
-    pull_policy: always
+    build:
+      context: ./frontend
     container_name: ortofrutta-frontend
     ports:
       - "3000:8080"

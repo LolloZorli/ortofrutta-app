@@ -142,8 +142,7 @@ Con il profilo `demo` esistono anche `commesso` / `commesso123`, `responsabile` 
 ### 2. Tutto in container
 
 ```bash
-docker compose --profile app pull              # scarica le immagini pubblicate su GHCR
-docker compose --profile app up -d             # app su http://localhost:3000, API su :8081
+docker compose --profile app up --build -d     # builda i sorgenti locali e avvia l'app
 ```
 
 PostgreSQL è raggiungibile dal PC su `localhost:5433`; i container si collegano invece al servizio Docker
@@ -152,10 +151,9 @@ Le richieste del frontend passano da nginx (`/api`) e restano sullo stesso origi
 l'header `Origin` al backend. `APP_CORS_ALLOWED_ORIGINS` in Compose autorizza comunque `http://localhost:3000`
 se si interroga direttamente l'API dalla porta `8081`.
 
-Per aggiornare l'app dopo una pubblicazione GitHub Actions, esegui `docker compose --profile app pull`
-e poi `docker compose --profile app up -d`. Se GHCR segnala `denied`, autentica Docker con un token GitHub
-che abbia `read:packages`, oppure rendi pubblici i package. Per provare modifiche ai sorgenti locali,
-usa una configurazione Compose di sviluppo con `build` per backend e frontend.
+Per vedere i log: `docker compose --profile app logs -f backend frontend`. Per fermare i container:
+`docker compose --profile app down`; il database resta nel volume locale. Per cancellare anche i dati demo:
+`docker compose --profile app down -v`. Questo ambiente usa i sorgenti presenti sul PC: non caricare dati reali.
 
 ### Installare l'app sul telefono
 
@@ -166,34 +164,29 @@ browser lo supporta. Il browser richiede HTTPS per installare; `localhost` vale 
 che esegue il browser, quindi per il telefono serve un indirizzo HTTPS raggiungibile dal telefono.
 L'interfaccia può aprirsi dalla cache, ma accesso, vendite e dati richiedono il backend raggiungibile.
 
-## CI/CD e deploy su Kubernetes
+## Flusso collaudo → produzione
 
-Ogni push su `master` esegue i test backend (`mvn verify`) e la build frontend. Se entrambi passano,
-il job `publish` costruisce e pubblica su GHCR le immagini `backend` e `frontend`, ciascuna con tag del commit
-(immutabile) e `latest`. Questo pubblica le immagini su GHCR, ma non modifica i container sul PC: per
-aggiornarli manualmente esegui `docker compose --profile app pull` e poi `docker compose --profile app up -d`.
-Le pull request eseguono solo la CI. Il job `deploy`, distinto da `publish`, aggiorna Kubernetes solo se la
-variabile repository `DEPLOY_KUBERNETES` è impostata a `true`.
+Gli ambienti sono separati: **collaudo** gira sul tuo PC con Docker e usa il branch GitHub `collaudo`;
+**produzione** gira su Render, collegato a Neon e al branch `master`.
 
-Prima del primo push configura:
+1. Crea una sola volta il branch remoto `collaudo` da `master`: `git switch -c collaudo`, poi `git push -u origin collaudo`.
+2. Sviluppa sul branch `collaudo`. Per provare la versione locale esegui `docker compose --profile app up --build -d`.
+   Ogni push a `collaudo` avvia anche GitHub Actions: test backend con PostgreSQL/Testcontainers, build frontend
+   e controlli di sicurezza. La CI verifica il codice nel runner GitHub, non avvia né aggiorna i container sul tuo PC.
+3. Quando le prove locali e i controlli Actions sono verdi, apri una pull request `collaudo` → `master`.
+   Dopo revisione e merge, la CI riparte su `master`; solo `master` pubblica le immagini GHCR e aggiorna la produzione Render.
+4. Se la versione non supera il collaudo, continua a lavorare su `collaudo`: non fare merge e Render non cambia.
 
-1. Aggiungi il secret GitHub Actions `KUBE_CONFIG` con un kubeconfig autorizzato a gestire il namespace
-   `ortofrutta`, e la variabile repository `DEPLOY_KUBERNETES=true`. Il workflow usa il `GITHUB_TOKEN`
-   per pubblicare i package; non serve un token GHCR per il job.
-2. Se i package GHCR sono privati, crea nel namespace `ortofrutta` il secret `ghcr-pull-secret`
-   con un token GitHub che abbia `read:packages` e accesso ai package. Se li rendi pubblici, il secret
-   non è necessario: in tal caso rimuovi `imagePullSecrets` dai Deployment.
-3. Prima del deploy crea nel namespace `ortofrutta` il Secret `ortofrutta-config` con le chiavi
-   `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET` (casuale e di almeno
-   32 caratteri), `ADMIN_PASSWORD` e, se serve, `ADMIN_USERNAME`. Le credenziali PostgreSQL devono
-   essere le stesse usate dal pod Postgres. Il manifest crea un PostgreSQL con PVC da 5Gi; per dati
-   reali configura storage e backup adeguati oppure usa un database gestito e modifica il manifest.
-4. Il Service frontend è di tipo `LoadBalancer` sulla porta 80; l'indirizzo esterno dipende dal
-   provider Kubernetes. Il database e il backend sono esposti solo all'interno del cluster.
+Non mettere password o URL database nei commit. Collaudo usa il PostgreSQL locale di Compose e dati demo; produzione usa
+un database Neon distinto, credenziali/JWT distinti e il profilo `prod`.
 
-Il namespace, PVC, Deployment e Service sono definiti in `k8s/app.yaml`. Le immagini vengono prima
-pubblicate su GHCR e poi impostate sui Deployment usando il tag immutabile del commit; il workflow
-attende la fine dei rolling update.
+Per impedire che una modifica salti il collaudo, in GitHub crea una ruleset o una branch protection per `master`:
+richiedi pull request e i controlli obbligatori `backend`, `frontend` e `security`; disabilita il push diretto.
+Render deve essere collegato solo a `master`, come nel Blueprint.
+
+Le immagini pubblicate su GHCR rimangono disponibili con tag commit e `latest` per eventuali deploy futuri.
+I manifest Kubernetes in `k8s/app.yaml` e `helm/ortofrutta` sono separati dal flusso Render descritto qui e non vengono
+aggiornati da questo workflow.
 
 Le migrazioni **V3–V7** aggiungono tipologiche e funzionalità senza cancellare i dati esistenti: V4 aggiunge
 il codice a barre, V5 collega le vendite ai clienti, introduce la chiusura contanti e le rettifiche inventario,
@@ -213,43 +206,27 @@ la registrazione autonoma: l'account riceve solo i permessi `CATALOG_READ`, `CUS
 restano in stato **Nuovo** finché il negozio non le conferma. Per ora non è configurata la verifica email:
 un cliente può accedere subito dopo essersi registrato.
 
-## Demo online gratuita per un cliente
-
-Per una prova online temporanea usa `render.demo.yaml`, non `render.yaml` (che crea risorse a pagamento).
-La configurazione pubblica la PWA e l'API sui piani Free di Render e usa PostgreSQL Free di Neon:
-
-1. Pubblica su GitHub il commit con `render.demo.yaml` e le ultime modifiche dell'app.
-2. Crea un progetto PostgreSQL Free su [Neon](https://neon.com/), preferibilmente nella regione europea. Da **Connect**
-   copia host, database, utente e password del ramo principale; conserva la stringa come segreto.
-3. In Render scegli **New → Blueprint**, collega il repository e indica `render.demo.yaml` come percorso del Blueprint.
-   Durante la configurazione inserisci le variabili richieste: `SPRING_DATASOURCE_URL` nel formato
-   `jdbc:postgresql://HOST/DATABASE?sslmode=require` (usa l'host pooled di Neon), `SPRING_DATASOURCE_USERNAME`,
-   `SPRING_DATASOURCE_PASSWORD`, una password robusta per `ADMIN_PASSWORD` e tre password robuste per gli account demo.
-   Render genera `JWT_SECRET`; non inserire credenziali nel repository.
-4. Attendi che il deploy di frontend e backend termini. Invia al cliente l'URL HTTPS del servizio statico
-   `ortofrutta-demo`; per l'accesso di prova condividi l'utente `commesso` e il valore configurato in
-   `DEMO_STAFF_PASSWORD`. Non condividere l'account `admin`.
-
-La demo viene precaricata con dati fittizi al primo avvio. Chi ha accesso all'account demo può modificare o cancellare
-i dati: non usarla per dati personali o operazioni reali. Su Render Free il backend si sospende dopo 15 minuti senza
-traffico e può impiegare circa un minuto a ripartire; Neon Free sospende il database inattivo e ha limiti di risorse.
-Render può sospendere un servizio Free che genera traffico anomalo verso database esterni. Sono servizi di prova,
-senza garanzia di disponibilità; verifica i limiti correnti dei piani prima di invitare il cliente.
-
-Per aggiornare la demo basta pubblicare le modifiche sul branch collegato e attendere i controlli CI. Per azzerare i
-dati, elimina e ricrea il database Neon: il precaricamento demo ripartirà al successivo avvio dell'API.
-
 ## Pubblicare la PWA su Render
 
-Il frontend React è statico e installabile come PWA; per login e dati ha comunque bisogno del backend Spring e di PostgreSQL. Il file `render.yaml` definisce frontend statico, API e database nella regione di Francoforte. Il frontend riceve un URL HTTPS `onrender.com`, quindi il dominio personalizzato è facoltativo.
+Il frontend React è statico e installabile come PWA; per login e dati ha bisogno del backend Spring e di PostgreSQL.
+Il file `render.yaml` definisce frontend statico e API; entrambi sono collegati esplicitamente al branch `master`.
+Render usa Neon come database esterno, quindi il Blueprint non crea né condivide un database Render.
 
 1. Crea un account Render e collega il repository GitHub.
 2. Da Render scegli **New → Blueprint**, seleziona questo repository e conferma `render.yaml`.
-3. Inserisci una password robusta per `ADMIN_PASSWORD` quando richiesta. Render genera `JWT_SECRET` e le credenziali del database.
-4. Attendi il completamento di frontend, backend e PostgreSQL, poi apri l'URL `onrender.com` del frontend.
-5. Accedi come `admin` usando la password inserita e cambiala al primo accesso. Il Blueprint configura il deploy dopo i controlli GitHub.
+3. Crea un progetto PostgreSQL su [Neon](https://neon.com/) nella regione più vicina a Render e copia le credenziali di connessione. Per produzione configura piano, backup e limiti di Neon adeguati all'uso: non considerare il piano gratuito una garanzia di disponibilità o backup.
+4. In Render configura le variabili richieste dal Blueprint: `SPRING_DATASOURCE_URL` nel formato
+   `jdbc:postgresql://HOST/DATABASE?sslmode=require` (preferibilmente l'endpoint pooled Neon), `SPRING_DATASOURCE_USERNAME`,
+   `SPRING_DATASOURCE_PASSWORD` e una password robusta per `ADMIN_PASSWORD`. Render genera `JWT_SECRET`.
+   Non usare credenziali o database di collaudo.
+5. Attendi il deploy e apri l'URL HTTPS del frontend. Il deploy automatico segue i controlli GitHub Actions sul branch `master`.
+   Accedi come `admin` e cambia la password iniziale.
 
-La configurazione usa il piano backend da 2 GB e PostgreSQL da 1 GB: ai prezzi Render consultati a novembre 2026 sono circa **$44 al mese complessivi**; il frontend statico non ha un costo di compute. Possono aggiungersi IVA, traffico oltre la quota inclusa e spazio database. La stima cambia se Render aggiorna i prezzi. I piani gratuiti vanno bene per una prova, non per dati di negozio: il database gratuito scade dopo 30 giorni e i servizi gratuiti possono fermarsi.
+Le migrazioni Flyway aggiornano lo schema Neon all'avvio dell'API. Prima di ogni aggiornamento produzione verifica i backup
+e le migrazioni; il frontend e il backend ricevono URL pubblici distinti solo per l'API, mentre il database non va esposto
+pubblicamente.
+Se hai già un database Render con dati, non scollegarlo o cancellarlo durante la sincronizzazione del Blueprint: prima
+esporta i dati, importali in Neon e verifica la connessione; conserva il backup prima di rimuovere il database precedente.
 
 Per installarla sul telefono apri l'URL HTTPS: su Android usa **Installa app** nel menu di Chrome; su iPhone usa **Condividi → Aggiungi alla schermata Home**. La PWA conserva la shell dell'interfaccia, ma le vendite e gli altri dati richiedono la connessione al backend.
 
@@ -335,8 +312,9 @@ La CI esegue Gitleaks, Trivy, lint Helm e la build backend/frontend prima della 
 ## Roadmap DevOps
 
 - [x] Dockerfile multi-stage, utente non root, CI base con GitHub Actions
-- [x] Pubblicazione immagini GHCR e deploy GitHub Actions su Kubernetes
-- [ ] Gate di sicurezza: Gitleaks, SAST (Semgrep/SonarQube), Trivy
-- [ ] Helm chart + Argo CD
+- [x] CI su `collaudo` e `master`, con test backend, build frontend, Gitleaks e Trivy
+- [x] Pubblicazione immagini GHCR su `master` e deploy produzione su Render con database Neon
+- [x] Helm chart disponibile per deploy Kubernetes manuale
+- [ ] SAST aggiuntivo (Semgrep/SonarQube)
 - [ ] Prometheus e Grafana
 - [ ] Terraform + AWS
