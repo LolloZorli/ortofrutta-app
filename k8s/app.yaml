@@ -112,7 +112,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: backend
-          image: ghcr.io/lollozorli/ortofrutta-app-backend:latest
+          image: ghcr.io/lollozorli/ortofrutta-backend:latest
           imagePullPolicy: Always
           ports:
             - name: http
@@ -183,7 +183,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: frontend
-          image: ghcr.io/lollozorli/ortofrutta-app-frontend:latest
+          image: ghcr.io/lollozorli/ortofrutta-frontend:latest
           imagePullPolicy: Always
           ports:
             - name: http

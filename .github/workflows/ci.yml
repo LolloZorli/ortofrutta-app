@@ -89,12 +89,12 @@ jobs:
           context: ./backend
           push: true
           tags: |
-            ghcr.io/lollozorli/ortofrutta-app-backend:${{ github.sha }}
-            ghcr.io/lollozorli/ortofrutta-app-backend:latest
+            ghcr.io/lollozorli/ortofrutta-backend:${{ github.sha }}
+            ghcr.io/lollozorli/ortofrutta-backend:latest
       - uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: true
           tags: |
-            ghcr.io/lollozorli/ortofrutta-app-frontend:${{ github.sha }}
-            ghcr.io/lollozorli/ortofrutta-app-frontend:latest
+            ghcr.io/lollozorli/ortofrutta-frontend:${{ github.sha }}
+            ghcr.io/lollozorli/ortofrutta-frontend:latest
