@@ -106,7 +106,7 @@ export default function LoginPage() {
       <form className="card login-card" onSubmit={submit}>
         <img className="login-logo" src="/icon.svg" alt="" />
         <h1 className="center">Ortofrutta</h1>
-        <p className="muted center">Un portale per clienti e negozi di ortofrutta</p>
+        <p className="muted center">Frutta fresca, ordini semplici.</p>
 
         {(mode !== 'forgot' && mode !== 'reset') && (
           <div className="auth-modes" role="tablist" aria-label="Tipo di accesso">
