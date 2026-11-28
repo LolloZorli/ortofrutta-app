@@ -1,7 +1,32 @@
 const eurFmt = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' })
 const numFmt = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 3 })
 
-export const eur = (n: number) => eurFmt.format(n)
+/** Arrotonda ai centesimi come BigDecimal con RoundingMode.HALF_UP nel backend. */
+export function roundMoney(value: number): number {
+  if (!Number.isFinite(value)) return value
+  const negative = value < 0
+  const [coefficient, exponentText] = Math.abs(value).toString().toLowerCase().split('e')
+  const exponent = Number(exponentText ?? 0)
+  const [whole, fraction = ''] = coefficient.split('.')
+  const digits = BigInt(whole + fraction)
+  const decimalPlaces = fraction.length - exponent
+  const centPlaces = decimalPlaces - 2
+  let cents: bigint
+
+  if (centPlaces <= 0) {
+    cents = digits * 10n ** BigInt(-centPlaces)
+  } else {
+    const divisor = 10n ** BigInt(centPlaces)
+    cents = digits / divisor
+    if ((digits % divisor) * 2n >= divisor) cents += 1n
+  }
+
+  if (cents === 0n) return 0
+  const rounded = Number(cents) / 100
+  return negative ? -rounded : rounded
+}
+
+export const eur = (n: number) => eurFmt.format(roundMoney(n))
 export const num = (n: number) => numFmt.format(n)
 /** Quantità con la sua unità di misura (l'etichetta breve arriva già dal server: kg, pz, mazzo...). */
 export const qty = (n: number, unit: string) => `${numFmt.format(n)} ${unit}`.trim()
