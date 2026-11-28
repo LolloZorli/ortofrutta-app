@@ -13,7 +13,11 @@ public enum LookupType {
     WASTE_REASON("waste_reasons", "Motivi di scarto", false, false),
     PAYMENT_METHOD("payment_methods", "Metodi di pagamento", false, false),
     CUSTOMER_TYPE("customer_types", "Tipi di cliente", false, false),
-    SUPPLIER_TYPE("supplier_types", "Tipi di fornitore", false, false);
+    SUPPLIER_TYPE("supplier_types", "Tipi di fornitore", false, false),
+    REGION("regions", "Regioni", false, false),
+    PROVINCE("provinces", "Province", false, false),
+    CITY("cities", "Città", false, false),
+    STREET_TYPE("street_types", "Tipi di via", false, false);
 
     private final String table;
     private final String label;

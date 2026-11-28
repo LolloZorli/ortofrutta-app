@@ -12,6 +12,10 @@ const EMPTY: Lookups = {
   PAYMENT_METHOD: [],
   CUSTOMER_TYPE: [],
   SUPPLIER_TYPE: [],
+  REGION: [],
+  PROVINCE: [],
+  CITY: [],
+  STREET_TYPE: [],
 }
 
 interface LookupsState {

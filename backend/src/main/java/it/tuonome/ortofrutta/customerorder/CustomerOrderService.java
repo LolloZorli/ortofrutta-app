@@ -248,7 +248,6 @@ public class CustomerOrderService {
     private void applyDeliveryTerms(CustomerOrder order, FulfillmentType type, String city,
                                     java.time.LocalDate date, Long slotId, BigDecimal subtotal) {
         if (type != FulfillmentType.DELIVERY) return;
-        if (slotId == null) throw new BusinessException("Scegli una fascia oraria per la consegna");
         var terms = delivery.reserve(city, date, slotId,
                 subtotal.setScale(2, java.math.RoundingMode.HALF_UP));
         order.setDeliveryTerms(terms.zoneId(), terms.slotId(), terms.slotName(), terms.fee());
