@@ -308,4 +308,42 @@ class RolesTest extends IntegrationTestBase {
                         .content("{\"username\":\"corta\",\"password\":\"123\",\"roleId\":" + staffRole + "}"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void adminResetPasswordReplacesOldCredentialAndRequiresNewPasswordChange() throws Exception {
+        String admin = admin();
+        long id = createUser(admin, "nuova-credenziale", roleId(admin, "STAFF"), "temporanea1");
+        String oldToken = login("nuova-credenziale", "temporanea1");
+
+        mvc.perform(post("/api/users/" + id + "/reset-password").header(AUTH, admin).contentType(JSON)
+                        .content("{\"newPassword\":\"passwordNuova1\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mustChangePassword").value(true));
+
+        mvc.perform(post("/api/auth/login").contentType(JSON)
+                        .content("{\"username\":\"nuova-credenziale\",\"password\":\"temporanea1\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/auth/login").contentType(JSON)
+                        .content("{\"username\":\"nuova-credenziale\",\"password\":\"passwordNuova1\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/products").header(AUTH, oldToken)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void employeeCannotManageUsersRolesOrOtherStores() throws Exception {
+        String admin = admin();
+        String staff = readyUser(admin, "limiti-permissioni", "STAFF");
+
+        mvc.perform(get("/api/users").header(AUTH, staff)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/users").header(AUTH, staff).contentType(JSON)
+                        .content("{\"username\":\"vietato\",\"password\":\"password123\",\"roleId\":1}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/roles").header(AUTH, staff)).andExpect(status().isForbidden());
+        mvc.perform(post("/api/roles").header(AUTH, staff).contentType(JSON)
+                        .content("{\"name\":\"Vietato\",\"permissions\":[\"SALES_CREATE\"]}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/audit").header(AUTH, staff)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/lookups/CATEGORY").header(AUTH, staff)).andExpect(status().isForbidden());
+    }
 }

@@ -52,4 +52,23 @@ class EmployeeRegistrationTest extends IntegrationTestBase {
         mvc.perform(get("/api/supplier-orders").header(AUTH, employee)).andExpect(status().isOk());
         mvc.perform(get("/api/users").header(AUTH, employee)).andExpect(status().isForbidden());
     }
+
+    @Test
+    void duplicateEmployeeRegistrationAndInvalidPasswordAreRejected() throws Exception {
+        String email = "employee-doppio-" + System.nanoTime() + "@example.test";
+        mvc.perform(post("/api/auth/register-employee").contentType(JSON)
+                        .content("{\"name\":\"Primo tentativo\",\"email\":\"" + email
+                                + "\",\"phone\":null,\"password\":\"password123\"}"))
+                .andExpect(status().isAccepted());
+
+        mvc.perform(post("/api/auth/register-employee").contentType(JSON)
+                        .content("{\"name\":\"Secondo tentativo\",\"email\":\"" + email
+                                + "\",\"phone\":null,\"password\":\"password123\"}"))
+                .andExpect(status().isConflict());
+
+        mvc.perform(post("/api/auth/register-employee").contentType(JSON)
+                        .content("{\"name\":\"Password corta\",\"email\":\"corta-" + System.nanoTime()
+                                + "@example.test\",\"phone\":null,\"password\":\"123\"}"))
+                .andExpect(status().isBadRequest());
+    }
 }

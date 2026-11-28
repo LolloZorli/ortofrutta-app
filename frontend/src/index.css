@@ -925,8 +925,72 @@ textarea:focus {
   font-size: 2rem;
   letter-spacing: -0.04em;
 }
-.login-card > p {
-  margin-top: -8px;
+.login-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: left;
+}
+.login-brand h1,
+.login-brand p {
+  margin: 0;
+}
+.login-brand p {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+.login-brand .login-logo {
+  margin: 0;
+}
+.account-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 4px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--primary-soft) 72%, var(--card));
+}
+.account-switch button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.account-switch button.active {
+  background: var(--card);
+  color: var(--primary);
+  box-shadow: 0 4px 14px rgba(23, 71, 47, 0.10);
+}
+.login-kicker {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--danger);
+  border-radius: 8px;
+  background: var(--danger-soft);
+  color: var(--text);
+  font-size: 0.86rem;
+}
+.login-submit {
+  min-height: 48px;
+}
+.login-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.link-button {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 .login-logo {
   width: 88px;
@@ -1130,6 +1194,81 @@ textarea:focus {
   .btn-sm {
     min-height: 44px;
   }
+}
+
+.customer-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.customer-search > span {
+  position: absolute;
+  left: 14px;
+  z-index: 1;
+  color: var(--primary);
+  font-size: 1.25rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+.customer-search input {
+  width: 100%;
+  min-height: 52px;
+  padding-left: 42px;
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+}
+.quantity-stepper {
+  display: grid;
+  grid-template-columns: 44px minmax(48px, 1fr) 44px;
+  align-items: center;
+  gap: 6px;
+}
+.quantity-stepper button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 1.25rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.quantity-stepper button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+.quantity-stepper input {
+  min-width: 0;
+  height: 44px;
+  text-align: center;
+  font-weight: 700;
+}
+.customer-basket-bar {
+  position: fixed;
+  z-index: 12;
+  left: 50%;
+  bottom: calc(var(--tabbar-h) + 18px + env(safe-area-inset-bottom));
+  width: min(420px, calc(100% - 24px));
+  min-height: 54px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-radius: 16px;
+  padding: 10px 16px;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 14px 36px rgba(23, 71, 47, 0.28);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.customer-checkout {
+  scroll-margin-top: 88px;
+  border-top: 3px solid var(--primary);
 }
 
 /* Dashboard: priorità visive e lettura rapida sul banco. */

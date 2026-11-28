@@ -73,6 +73,20 @@ export default function CustomerPortalPage() {
     setDeliverySlotId('')
   }
 
+  function changeQuantity(item: CatalogItem, delta: number) {
+    const current = Number((quantities[item.id] ?? '0').replace(',', '.')) || 0
+    const next = Math.max(0, Math.min(item.availableQuantity, current + delta))
+    setBasketProducts((currentProducts) => ({ ...currentProducts, [item.id]: item }))
+    setQuantities((currentQuantities) => ({
+      ...currentQuantities,
+      [item.id]: next === 0 ? '' : String(next),
+    }))
+  }
+
+  function openBasket() {
+    document.getElementById('customer-order-checkout')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   async function submitOrder() {
     const lines = Object.entries(quantities).map(([productId, quantity]) => ({
       productId: Number(productId), quantity: Number(quantity.replace(',', '.')),
@@ -128,7 +142,10 @@ export default function CustomerPortalPage() {
       {shops.error && <ErrorBox message={shops.error} onRetry={shops.reload} />}
     </div>
     {!selectedShopSlug ? <Empty>Seleziona un negozio per consultare il catalogo e inviare ordini.</Empty> : <>
-      <input maxLength={100} placeholder="Cerca prodotti o categorie…" value={search} onChange={(event) => setSearch(event.target.value)} />
+      <div className="customer-search">
+        <span aria-hidden="true">⌕</span>
+        <input maxLength={100} placeholder="Cerca prodotti o categorie…" value={search} onChange={(event) => setSearch(event.target.value)} />
+      </div>
       {catalog.error ? <ErrorBox message={catalog.error} onRetry={catalog.reload} />
         : catalog.loading ? <p className="muted" role="status">Cerco nel catalogo…</p>
           : visible.length === 0 ? <Empty>{search.trim() ? 'Nessun prodotto disponibile corrisponde alla ricerca.' : 'Al momento non ci sono prodotti disponibili in magazzino.'}</Empty>
@@ -136,14 +153,24 @@ export default function CustomerPortalPage() {
               {visible.map((item) => <div className="card stack" key={item.id}>
                 <div><div className="item-title">{item.name}</div><div className="item-sub">{item.category} · {eur(item.salePrice)}/{item.unit}</div>
                   <div className="item-sub">Disponibili: {qty(item.availableQuantity, item.unit)}</div></div>
-                <label className="field"><span>Quantità ({item.unit})</span><input inputMode="decimal" min="0" max={item.availableQuantity} step="any" value={quantities[item.id] ?? ''}
-                  onChange={(event) => {
-                    setBasketProducts((current) => ({ ...current, [item.id]: item }))
-                    setQuantities((current) => ({ ...current, [item.id]: event.target.value }))
-                  }} /></label>
+                <div className="quantity-stepper" aria-label={`Quantità di ${item.name}`}>
+                  <button type="button" aria-label={`Rimuovi ${item.name}`} onClick={() => changeQuantity(item, -1)} disabled={!quantities[item.id]}>−</button>
+                  <input inputMode="decimal" min="0" max={item.availableQuantity} step="any" value={quantities[item.id] ?? ''}
+                    onChange={(event) => {
+                      setBasketProducts((current) => ({ ...current, [item.id]: item }))
+                      setQuantities((current) => ({ ...current, [item.id]: event.target.value }))
+                    }} />
+                  <button type="button" aria-label={`Aggiungi ${item.name}`} onClick={() => changeQuantity(item, 1)}>＋</button>
+                </div>
               </div>)}
             </div>}
-      {Object.values(quantities).some((quantity) => Number(quantity.replace(',', '.')) > 0) && <section className="card stack">
+      {Object.values(quantities).some((quantity) => Number(quantity.replace(',', '.')) > 0) && (
+        <button type="button" className="customer-basket-bar" onClick={openBasket}>
+          <span>Vedi il tuo ordine</span>
+          <strong>{eur(productSubtotal)}</strong>
+        </button>
+      )}
+      {Object.values(quantities).some((quantity) => Number(quantity.replace(',', '.')) > 0) && <section id="customer-order-checkout" className="card stack customer-checkout">
         <h3 className="section-title">Il tuo ordine · {selectedShop?.name}</h3>
         {Object.entries(quantities).filter(([, quantity]) => Number(quantity.replace(',', '.')) > 0).map(([id, quantity]) => {
           const item = basketProducts[Number(id)]
