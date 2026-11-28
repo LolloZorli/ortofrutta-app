@@ -1,8 +1,10 @@
 package it.tuonome.ortofrutta.product;
 
 import it.tuonome.ortofrutta.company.CompanyContext;
+import it.tuonome.ortofrutta.common.BusinessException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -19,8 +21,11 @@ public class CatalogController {
     public CatalogController(JdbcClient jdbc) { this.jdbc = jdbc; }
 
     @GetMapping
-    public List<Item> list() {
+    public List<Item> list(@RequestParam(defaultValue = "") String q) {
+        String query = q.trim();
+        if (query.length() > 100) throw new BusinessException("La ricerca non può superare 100 caratteri");
         return jdbc.sql("""
+                with catalog as (
                 select p.id, p.name, c.name as category, u.short_label as unit, p.sale_price,
                        greatest(coalesce(stock.quantity, 0) - coalesce(reserved.quantity, 0), 0) as available_quantity
                 from products p join product_categories c on c.id=p.category_id join units u on u.id=p.unit_id
@@ -35,8 +40,24 @@ public class CatalogController {
                     where col.product_id = p.id and col.company_id = p.company_id
                       and co.status in ('NEW', 'READY')
                 ) reserved on true
-                where p.active and p.company_id = :companyId order by p.name
-                """).param("companyId", CompanyContext.requireId()).query((rs, n) -> new Item(rs.getLong("id"), rs.getString("name"),
-                rs.getString("category"), rs.getString("unit"), rs.getBigDecimal("sale_price"), rs.getBigDecimal("available_quantity"))).list();
+                where p.active and p.company_id = :companyId
+                )
+                select id, name, category, unit, sale_price, available_quantity
+                from catalog
+                where available_quantity > 0
+                  and (:query = '' or position(lower(:query) in lower(name)) > 0
+                       or position(lower(:query) in lower(category)) > 0
+                       or lower(name) % lower(:query) or lower(category) % lower(:query))
+                order by case when :query = '' then 0
+                              when position(lower(:query) in lower(name)) > 0 then 1
+                              when position(lower(:query) in lower(category)) > 0 then 0.5
+                              else greatest(similarity(lower(name), lower(:query)),
+                              similarity(lower(category), lower(:query))) end desc,
+                         name
+                limit case when :query = '' then 2147483647 else 50 end
+                """).param("companyId", CompanyContext.requireId()).param("query", query)
+                .query((rs, n) -> new Item(rs.getLong("id"), rs.getString("name"), rs.getString("category"),
+                        rs.getString("unit"), rs.getBigDecimal("sale_price"),
+                        rs.getBigDecimal("available_quantity"))).list();
     }
 }

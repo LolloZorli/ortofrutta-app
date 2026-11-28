@@ -62,6 +62,9 @@ public class UserService {
         }
         AppUser u = byName != null ? byName : byEmail;
         if (u != null) {
+            if (u.isCustomerAccount()) {
+                throw new BusinessException("Un account cliente non può essere associato come account aziendale");
+            }
             if (!encoder.matches(r.password(), u.getPasswordHash())) {
                 throw new BusinessException("Account esistente: password non valida per associarlo a questa azienda");
             }
@@ -87,6 +90,9 @@ public class UserService {
         if (u.getUsername().equals(currentUsername)) {
             throw new BusinessException("Non puoi modificare il tuo stesso ruolo o stato");
         }
+        if (u.isCustomerAccount()) {
+            throw new BusinessException("Gli account cliente non possono essere modificati come utenti aziendali");
+        }
         AppRole role = findRole(r.roleId());
         if (role.isCustomerRole()) throw new BusinessException("Il ruolo Cliente si assegna solo tramite la registrazione clienti");
         membership.setRole(role);
@@ -100,6 +106,9 @@ public class UserService {
     public UserDtos.Response resetPassword(Long id, UserDtos.ResetPasswordRequest r) {
         CompanyMembership membership = findMembership(id);
         AppUser u = membership.getUser();
+        if (u.isCustomerAccount()) {
+            throw new BusinessException("La password dell'account cliente va cambiata dal cliente");
+        }
         if (memberships.countByUserId(id) != 1) {
             throw new BusinessException("Questo account è condiviso: la password va cambiata dall'utente");
         }

@@ -1,153 +1,106 @@
 # Ortofrutta
 
-Gestionale web multi-azienda per negozi di frutta e verdura. Riunisce vendite, magazzino, ordini e clienti in un'interfaccia mobile-first, installabile come PWA.
+Gestionale web per negozi di frutta e verdura: cassa, magazzino, ordini e clienti in un'interfaccia mobile-first installabile come PWA.
 
-## Funzionalità
+## Panoramica
 
-- **Cassa e vendite**: ricerca prodotti e codici a barre, pagamenti, clienti, storni e chiusura contanti.
-- **Magazzino**: lotti con costo e scadenza, consumo FIFO, carichi, inventario, scarti e storico movimenti.
+- **Cassa**: vendita di più prodotti, ricerca per nome o codice a barre, pagamenti, clienti e storni.
+- **Magazzino**: lotti con costo e scadenza, carichi, inventario, scarti e movimenti tracciati. Le vendite consumano i lotti in ordine FIFO.
 - **Ordini**: acquisti dai fornitori e prenotazioni dei clienti, con ritiro o consegna a domicilio.
-- **Gestione**: anagrafiche, report, cartellini prezzo, ruoli e permessi configurabili, registro attività.
-- **Portale clienti**: registrazione, catalogo e consultazione dei propri ordini.
-- **Multi-azienda**: dati e permessi isolati per negozio.
+- **Gestione**: anagrafiche, report, chiusura contanti, cartellini prezzo, ruoli e permessi, registro attività.
+- **Portale clienti**: account personale indipendente dal negozio; il cliente sceglie il negozio, cerca nel catalogo anche con refusi e gestisce i propri ordini.
+- **Multi-azienda**: cataloghi, ordini e permessi aziendali sono isolati per negozio; l'identità cliente è globale e il profilo nel negozio viene creato al primo ordine.
 
-Le aliquote IVA e altre tipologiche sono configurabili dall'amministratore. Verifica le aliquote con il commercialista prima di usare dati reali: la migrazione iniziale assegna il 4% ai prodotti esistenti.
+### Tecnologie
 
-## Tecnologie
+Frontend React e TypeScript; backend Java 21 e Spring Boot; database PostgreSQL con migrazioni Flyway. La ricerca catalogo usa `pg_trgm` di PostgreSQL, senza un servizio Elasticsearch esterno. Il frontend è una PWA e comunica con l'API Spring.
 
-| Componente | Stack |
+## Pubblicazione: GitHub, Render e Neon
+
+Il repository è collegato a Render tramite `render.yaml`; Render ospita il frontend statico e il backend, mentre Neon fornisce PostgreSQL.
+
+1. Le modifiche vengono sviluppate sul branch `collaudo`. Il push esegue i controlli CI, ma non aggiorna la produzione.
+2. Quando i controlli sono verdi, si apre una pull request da `collaudo` a `master`.
+3. Il merge su `master` esegue la CI. Se i controlli passano, Render distribuisce frontend e backend dal repository.
+4. Il backend usa il profilo `prod`; Flyway applica le migrazioni al database all'avvio.
+
+Il Blueprint configura il backend sul piano gratuito, il frontend statico e i collegamenti URL fra i servizi. Per il database configura in Render:
+
+| Variabile | Valore |
 |---|---|
-| Backend | Java 21, Spring Boot 3.5, Spring Security, JPA, Flyway |
-| Frontend | React 18, TypeScript, Vite |
-| Database | PostgreSQL 16 |
-| Container e deploy | Docker Compose, GHCR, Render; chart Helm disponibile |
+| `SPRING_DATASOURCE_URL` | URL JDBC Neon, ad esempio `jdbc:postgresql://HOST/DATABASE?sslmode=require` |
+| `SPRING_DATASOURCE_USERNAME` | Utente database Neon |
+| `SPRING_DATASOURCE_PASSWORD` | Password database Neon |
+| `ADMIN_PASSWORD` | Password robusta iniziale per l'amministratore |
 
-```mermaid
-flowchart LR
-  U[Browser / PWA] --> F[React + nginx]
-  F -->|/api| B[Spring Boot API]
-  B --> D[(PostgreSQL)]
-```
+Render genera `JWT_SECRET`. Il Blueprint collega `VITE_API_BASE_URL`, `APP_CORS_ALLOWED_ORIGINS` e `PASSWORD_RESET_BASE_URL` agli URL pubblici dei servizi. Non impostare questi valori con `localhost` in produzione e non committare file `.env` o credenziali.
 
-## Avvio in locale
+Dopo il deploy:
 
-Prerequisiti: Git, Docker con Docker Compose, Java 21 e Maven per lo sviluppo backend, Node.js 22 per il frontend.
+- controlla i log backend: Flyway deve completare e Spring deve avviarsi senza errori di connessione;
+- verifica `https://<backend>/actuator/health` e `https://<backend>/actuator/health/readiness`;
+- apri il frontend, accedi come admin e cambia la password iniziale.
 
-### Avvio completo con Docker
+### Limiti del piano gratuito
 
-Dalla radice del repository:
+Il backend gratuito può andare in sleep dopo 15 minuti senza traffico e impiegare circa un minuto a riattivarsi. La PWA conserva la shell dell'interfaccia, ma vendite, ordini e autenticazione richiedono il backend raggiungibile: non è una modalità offline. Filesystem locale e database in-memory non sono persistenti: i dati applicativi devono restare su Neon. Verifica le quote correnti di Render e Neon; il piano gratuito è adatto a prove e progetti personali, non offre garanzie di disponibilità o backup.
+
+## Sviluppo locale
+
+Prerequisiti: Docker Compose, Java 21 e Node.js 22.
+
+Per avviare database, backend e frontend in container dalla radice:
 
 ```bash
 docker compose --profile app up --build -d
 ```
 
-Apri <http://localhost:3000>. L'API è disponibile su <http://localhost:8081>; PostgreSQL sulla porta `5433` dell'host. Il database nel container è raggiungibile dagli altri servizi come `db:5432`.
+Apri <http://localhost:3000>. L'API è su `http://localhost:8081`; il database locale usa la porta `5433`. Questo ambiente carica dati demo e usa credenziali predefinite: non riutilizzarle in produzione.
 
-In ambiente locale Compose usa dati demo e credenziali predefinite (`admin` / `admin123`); al primo accesso l'amministratore deve cambiare password. **Non usare queste credenziali, i dati demo o il secret JWT predefinito in produzione.** Per fermare i servizi senza cancellare i dati:
+Per fermare i container mantenendo i dati:
 
 ```bash
 docker compose --profile app down
 ```
 
-Per eliminare anche il volume PostgreSQL locale:
-
-```bash
-docker compose --profile app down -v
-```
-
-### Sviluppo con servizi separati
-
-Avvia il database:
-
-```bash
-docker compose up -d db
-```
-
-Poi, in due terminali:
+Per sviluppo con frontend e backend avviati separatamente, avvia PostgreSQL con `docker compose up -d db`, poi:
 
 ```bash
 mvn -f backend/pom.xml spring-boot:run
-```
-
-```bash
 npm --prefix frontend ci
 npm --prefix frontend run dev
 ```
 
-Il frontend di sviluppo è disponibile su <http://localhost:5173>. Per caricare dati demo nel backend imposta `SPRING_PROFILES_ACTIVE=demo`. L'admin locale predefinito è `admin` / `admin123`.
-
-## Test e controlli
+La build frontend verifica i tipi TypeScript; `npm test` esegue i test unitari. I test backend di integrazione usano Testcontainers e richiedono Docker:
 
 ```bash
-mvn -B -f backend/pom.xml verify
-npm --prefix frontend ci
+npm --prefix frontend test
 npm --prefix frontend run build
-helm lint helm/ortofrutta
+mvn -B -f backend/pom.xml verify
 ```
 
-I test backend di integrazione usano Testcontainers: Docker deve essere avviato. La build frontend esegue il controllo TypeScript e la build di produzione.
+## Configurazione e funzionalità opzionali
 
-## CI e immagini Docker
+Per lo sviluppo locale, `docker-compose.yml` fornisce le credenziali del database, il profilo demo e i valori predefiniti. Non copiare questi valori in Render.
 
-GitHub Actions esegue la pipeline sui push a `collaudo` e `master` e sulle pull request:
+Il reset password e le notifiche email richiedono un server SMTP configurato tramite `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME` e `SPRING_MAIL_PASSWORD`. I destinatari delle notifiche si impostano con `NOTIFICATION_RECIPIENT_EMAILS`. Sul piano gratuito, che può sospendere il backend per inattività, le notifiche pianificate non sono affidabili: non usarle come unico avviso operativo.
 
-1. test e verifica backend con Maven;
-2. controllo TypeScript e build frontend;
-3. scansione segreti con Gitleaks, lint Helm e scansione vulnerabilità con Trivy.
+Le aliquote IVA sono configurabili dall'amministratore. Verificale con il commercialista prima di utilizzare dati reali: la migrazione iniziale assegna il 4% ai prodotti esistenti. Il riepilogo dei corrispettivi è gestionale e non sostituisce un registratore di cassa fiscale.
 
-Solo un push su `master`, dopo il completamento dei controlli, pubblica le immagini su GitHub Container Registry (GHCR):
+### Backup manuale Neon
 
-| Componente | Immagine |
-|---|---|
-| API | `ghcr.io/lollozorli/ortofrutta-backend` |
-| Frontend | `ghcr.io/lollozorli/ortofrutta-frontend` |
-
-Ogni immagine viene pubblicata con un tag corrispondente allo SHA del commit e con il tag mobile `latest`. Per deploy riproducibili, preferisci il tag SHA. I vecchi package `ortofrutta-app-backend` e `ortofrutta-app-frontend` eventualmente presenti su GHCR non vengono rimossi automaticamente.
-
-## Collaudo e produzione
-
-- **Collaudo**: lavora e verifica le modifiche sul branch `collaudo`. Il push esegue la CI, ma non pubblica immagini né aggiorna Render.
-- **Produzione**: apri una pull request da `collaudo` a `master`. Il merge fa ripartire i controlli; dopo il successo, il workflow pubblica le immagini e Render può distribuire il commit di `master`.
-
-Il file `render.yaml` definisce un frontend statico e un backend Docker sul piano gratuito; il database è esterno (Neon). Per mantenere il servizio gratuito, usa anche il piano gratuito di Neon e controlla i limiti di utilizzo del tuo account. Configura in Render le credenziali del database (`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`) e `ADMIN_PASSWORD`. Render genera `JWT_SECRET`; il Blueprint valorizza `APP_CORS_ALLOWED_ORIGINS` e `PASSWORD_RESET_BASE_URL` con l'URL del frontend. Il backend usa il profilo `prod`, quindi non carica i dati demo. Mantieni `ADMIN_MUST_CHANGE_PASSWORD=true` e usa password robuste; non riutilizzare credenziali o database di collaudo.
-
-Il backend gratuito Render va in sleep dopo 15 minuti senza traffico e può impiegare circa un minuto a riattivarsi; il filesystem del servizio è effimero, quindi i dati devono restare nel database esterno. Il piano gratuito ha limiti mensili su ore, banda e build: controlla l'utilizzo e le condizioni aggiornate di Render e Neon per evitare sospensioni o addebiti per eventuali eccedenze.
-
-Il controllo di salute Render usa `/actuator/health/readiness`; puoi verificare manualmente il backend anche su `/actuator/health`, che deve restituire `{"status":"UP"}`. Dopo il deploy controlla nei log che Flyway abbia completato le migrazioni e che Spring si sia avviato. Prima di collegare un database già in uso o applicare migrazioni, fai un backup. La PWA richiede HTTPS per l'installazione e una connessione al backend per autenticazione e dati.
-
-## Deploy Kubernetes (opzionale)
-
-Il chart Helm è separato dal deploy Render e non viene installato dalla CI. Configura prima i secret previsti dai valori del chart (`ortofrutta-config` e `ghcr-pull-secret`), quindi:
+Per una copia manuale servono i PostgreSQL client (`pg_dump` e `pg_restore`) e la connection string Neon. In una shell Bash, salva la stringa in una variabile d'ambiente senza inserirla nei comandi condivisi o nel repository:
 
 ```bash
-helm lint helm/ortofrutta
-helm upgrade --install ortofrutta helm/ortofrutta \
-  --namespace ortofrutta --create-namespace \
-  --set backend.tag=<commit-sha> \
-  --set frontend.tag=<commit-sha>
+export NEON_DATABASE_URL='postgresql://...'
+pg_dump --format=custom --no-owner --file="$HOME/ortofrutta-backup.dump" "$NEON_DATABASE_URL"
 ```
 
-I repository predefiniti del chart sono `ghcr.io/lollozorli/ortofrutta-backend` e `ghcr.io/lollozorli/ortofrutta-frontend`.
+Conserva il dump in un luogo privato e protetto, non nel repository. Per ripristinarlo, crea prima un database Neon vuoto e usa la sua connection string come destinazione:
 
-## Configurazione
+```bash
+export RESTORE_DATABASE_URL='postgresql://...'
+pg_restore --no-owner --dbname="$RESTORE_DATABASE_URL" "$HOME/ortofrutta-backup.dump"
+```
 
-| Variabile | Uso |
-|---|---|
-| `SPRING_DATASOURCE_URL` | URL JDBC PostgreSQL; in Compose è configurato per `db:5432` |
-| `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` | Credenziali database |
-| `JWT_SECRET` | Chiave di firma JWT; usa un valore casuale e privato in produzione |
-| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | Credenziali iniziali, applicate quando il database non contiene utenti |
-| `ADMIN_MUST_CHANGE_PASSWORD` | Richiede il cambio della password iniziale |
-| `SPRING_PROFILES_ACTIVE` | Attiva profili applicativi come `demo` o `prod` |
-| `APP_CORS_ALLOWED_ORIGINS` | Origini abilitate per le richieste cross-origin |
-| `PASSWORD_RESET_BASE_URL`, `PASSWORD_RESET_TOKEN_TTL` | URL pubblico e durata dei token di reset password |
-| `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` | Configurazione SMTP |
-| `NOTIFICATION_RECIPIENT_EMAILS`, `NOTIFICATION_CRON` | Destinatari e orario delle notifiche |
-
-Non inserire password, token o URL con credenziali nei commit. Configura i valori sensibili come secret nell'ambiente di deploy.
-
-## Note
-
-- L'app non sostituisce un registratore di cassa fiscale: i corrispettivi sono un prospetto gestionale interno.
-- Per un uso commerciale, configura informativa e misure adeguate alla protezione dei dati personali.
-- La documentazione tecnica delle API è esposta dal backend tramite Swagger UI su `/swagger-ui.html`.
+Non eseguire il ripristino sul database in uso: questa procedura è per un database di destinazione vuoto. Verifica periodicamente il backup ripristinandolo in un ambiente separato e collauda le migrazioni prima di applicarle ai dati reali.

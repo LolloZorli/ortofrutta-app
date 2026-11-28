@@ -16,8 +16,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Trasforma un token valido in un'autenticazione con i permessi ATTUALI dell'utente, letti dal database
- * (una query sola: utente + ruolo + permessi).
+ * Trasforma un token valido in un'autenticazione con i permessi attuali, letti dal database per gli utenti aziendali.
+ * Gli account cliente globali ricevono solo le tre autorizzazioni del portale clienti.
  * - utente inesistente o disattivato: token rifiutato (401);
  * - utente che deve cambiare password: nessun permesso, può usare solo /api/auth/me e /api/auth/change-password;
  * - altrimenti: l'autorità "ACCESS" (utente attivo) più un'autorità per ogni permesso del suo ruolo.
@@ -28,18 +28,32 @@ public class UserJwtAuthenticationConverter implements Converter<Jwt, AbstractAu
     public static final String ACCESS = "ACCESS";
 
     private final CompanyMembershipRepository memberships;
+    private final UserRepository users;
 
-    public UserJwtAuthenticationConverter(CompanyMembershipRepository memberships) {
+    public UserJwtAuthenticationConverter(CompanyMembershipRepository memberships, UserRepository users) {
         this.memberships = memberships;
+        this.users = users;
     }
 
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
+        AppUser user = users.findByUsernameIgnoreCase(jwt.getSubject())
+                .filter(AppUser::isEnabled)
+                .orElseThrow(() -> new BadCredentialsException("Utente non valido o disattivato"));
+        if (user.isCustomerAccount()) {
+            List<GrantedAuthority> customerAuthorities = new ArrayList<>();
+            if (!user.isMustChangePassword()) {
+                customerAuthorities.add(new SimpleGrantedAuthority(ACCESS));
+                customerAuthorities.add(new SimpleGrantedAuthority(Permission.CATALOG_READ.name()));
+                customerAuthorities.add(new SimpleGrantedAuthority(Permission.CUSTOMER_ORDER_CREATE.name()));
+                customerAuthorities.add(new SimpleGrantedAuthority(Permission.CUSTOMER_ORDER_READ.name()));
+            }
+            return new JwtAuthenticationToken(jwt, customerAuthorities, user.getUsername());
+        }
+
         CompanyMembership membership = memberships.findActiveByCompanyAndUsername(
                         CompanyContext.requireId(), jwt.getSubject())
                 .orElseThrow(() -> new BadCredentialsException("Utente non valido o disattivato"));
-        AppUser user = membership.getUser();
-        if (!user.isEnabled()) throw new BadCredentialsException("Utente non valido o disattivato");
 
         List<GrantedAuthority> authorities = new ArrayList<>();
         if (!user.isMustChangePassword()) {

@@ -5,8 +5,12 @@ const PROFILE_KEY = 'ortofrutta.profile'
 const COMPANY_KEY = 'ortofrutta.company'
 
 export const companySession = {
-  slug: () => localStorage.getItem(COMPANY_KEY) ?? 'ortofrutta',
-  select: (slug: string) => localStorage.setItem(COMPANY_KEY, slug.trim().toLowerCase()),
+  slug: () => localStorage.getItem(COMPANY_KEY) ?? '',
+  select: (slug: string) => {
+    const value = slug.trim().toLowerCase()
+    if (value) localStorage.setItem(COMPANY_KEY, value)
+    else localStorage.removeItem(COMPANY_KEY)
+  },
 }
 
 export const session = {
@@ -52,7 +56,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const token = session.token()
   if (token) headers.Authorization = `Bearer ${token}`
   if (path !== '/companies' && path !== '/companies/register') {
-    headers['X-Company-Slug'] = companySession.slug()
+    const companySlug = companySession.slug()
+    if (companySlug) headers['X-Company-Slug'] = companySlug
   }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
 
@@ -99,7 +104,8 @@ export const api = {
     const headers: Record<string, string> = {}
     const token = session.token()
     if (token) headers.Authorization = `Bearer ${token}`
-    headers['X-Company-Slug'] = companySession.slug()
+    const companySlug = companySession.slug()
+    if (companySlug) headers['X-Company-Slug'] = companySlug
     const res = await fetch(`${API_BASE_URL}/api${path}`, { headers })
     if (!res.ok) throw new ApiError(res.status, res.status === 403
       ? 'Non hai i permessi per questa operazione'

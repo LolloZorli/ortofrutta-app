@@ -39,6 +39,9 @@ class CompanyIsolationTest extends IntegrationTestBase {
         mvc.perform(post("/api/stock/receipts").header(AUTH, adminA).header(COMPANY, slugA).contentType(JSON)
                         .content("{\"productId\":" + productA + ",\"quantity\":10,\"unitCost\":1.00}"))
                 .andExpect(status().isCreated());
+        mvc.perform(post("/api/stock/receipts").header(AUTH, adminB).header(COMPANY, slugB).contentType(JSON)
+                        .content("{\"productId\":" + productB + ",\"quantity\":10,\"unitCost\":1.00}"))
+                .andExpect(status().isCreated());
 
         mvc.perform(post("/api/roles").header(AUTH, adminA).header(COMPANY, slugA).contentType(JSON)
                         .content("{\"name\":\"Ruolo privato " + unique + "\",\"permissions\":[\"STOCK_READ\"]}"))
@@ -58,16 +61,20 @@ class CompanyIsolationTest extends IntegrationTestBase {
         assertThat(containsUsername(usersB, employee)).isFalse();
 
         String customerEmail = "cliente-condiviso-" + unique + "@example.test";
-        registerCustomerIn(customerEmail, slugA);
-        registerCustomerIn(customerEmail, slugB);
-        String customerA = loginFor(customerEmail, "password123", slugA);
-        String customerB = loginFor(customerEmail, "password123", slugB);
+        registerCustomerIn(customerEmail);
+        String customer = login(customerEmail, "password123");
+        mvc.perform(get("/api/auth/me").header(AUTH, customer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.roleCode").value("CUSTOMER"));
 
-        JsonNode catalogA = json(mvc.perform(get("/api/catalog").header(AUTH, customerA).header(COMPANY, slugA))
+        JsonNode catalogA = json(mvc.perform(get("/api/catalog").header(AUTH, customer).header(COMPANY, slugA))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-        JsonNode catalogB = json(mvc.perform(get("/api/catalog").header(AUTH, customerB).header(COMPANY, slugB))
+        JsonNode fuzzyCatalogA = json(mvc.perform(get("/api/catalog").header(AUTH, customer).header(COMPANY, slugA)
+                        .param("q", "Pree A " + unique))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        JsonNode catalogB = json(mvc.perform(get("/api/catalog").header(AUTH, customer).header(COMPANY, slugB))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertThat(hasProduct(catalogA, productA)).isTrue();
+        assertThat(hasProduct(fuzzyCatalogA, productA)).isTrue();
         assertThat(hasProduct(catalogA, productB)).isFalse();
         assertThat(hasProduct(catalogB, productB)).isTrue();
         assertThat(hasProduct(catalogB, productA)).isFalse();
@@ -77,14 +84,22 @@ class CompanyIsolationTest extends IntegrationTestBase {
         mvc.perform(get("/api/products/" + productB).header(AUTH, adminA).header(COMPANY, slugA))
                 .andExpect(status().isNotFound());
 
-        mvc.perform(post("/api/customer-orders/mine").header(AUTH, customerA).header(COMPANY, slugA)
+        mvc.perform(post("/api/customer-orders/mine").header(AUTH, customer).header(COMPANY, slugA)
                         .contentType(JSON).content("{\"pickupDate\":\"" + LocalDate.now().plusDays(1)
                                 + "\",\"notes\":null,\"lines\":[{\"productId\":" + productA + ",\"quantity\":1}]}"))
                 .andExpect(status().isCreated());
-        mvc.perform(get("/api/customer-orders/mine").header(AUTH, customerA).header(COMPANY, slugA))
+        mvc.perform(get("/api/customer-orders/mine").header(AUTH, customer).header(COMPANY, slugA))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
-        mvc.perform(get("/api/customer-orders/mine").header(AUTH, customerB).header(COMPANY, slugB))
+        mvc.perform(get("/api/customer-orders/mine").header(AUTH, customer).header(COMPANY, slugB))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(post("/api/customer-orders/mine").header(AUTH, customer).header(COMPANY, slugB)
+                        .contentType(JSON).content("{\"pickupDate\":\"" + LocalDate.now().plusDays(1)
+                                + "\",\"notes\":null,\"lines\":[{\"productId\":" + productB + ",\"quantity\":1}]}"))
+                .andExpect(status().isCreated());
+        mvc.perform(get("/api/customer-orders/mine").header(AUTH, customer).header(COMPANY, slugA))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
+        mvc.perform(get("/api/customer-orders/mine").header(AUTH, customer).header(COMPANY, slugB))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
     }
 
     private void registerShop(String name, String slug, String ownerName, String email) throws Exception {
@@ -103,8 +118,8 @@ class CompanyIsolationTest extends IntegrationTestBase {
         return "Bearer " + json(body).get("token").asText();
     }
 
-    private void registerCustomerIn(String email, String slug) throws Exception {
-        mvc.perform(post("/api/auth/register").header(COMPANY, slug).contentType(JSON)
+    private void registerCustomerIn(String email) throws Exception {
+        mvc.perform(post("/api/auth/register").contentType(JSON)
                         .content("{\"name\":\"Cliente condiviso\",\"email\":\"" + email
                                 + "\",\"phone\":null,\"password\":\"password123\"}"))
                 .andExpect(status().isCreated());

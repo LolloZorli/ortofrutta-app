@@ -63,7 +63,7 @@ export default function CorrispettiviPage() {
           {data.byVat.length === 0 ? (
             <p className="muted center pad">Nessuna vendita in questo giorno.</p>
           ) : (
-            <div className="card" style={{ overflowX: 'auto' }}>
+            <div className="card table-scroll">
               <table className="table">
                 <thead>
                   <tr>

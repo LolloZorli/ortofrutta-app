@@ -35,6 +35,12 @@ public final class AuthDtos {
                     membership.getRole().effectivePermissions().stream().map(Enum::name).sorted().toList(),
                     u.isMustChangePassword());
         }
+
+        static Profile customer(AppUser u) {
+            return new Profile(u.getUsername(), u.getDisplayName(), u.getEmail(), AppRole.CUSTOMER_CODE, "Cliente",
+                    List.of("CATALOG_READ", "CUSTOMER_ORDER_CREATE", "CUSTOMER_ORDER_READ"),
+                    u.isMustChangePassword());
+        }
     }
 
     public record LoginResponse(String token, Instant expiresAt, Profile profile) {

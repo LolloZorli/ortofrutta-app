@@ -1,8 +1,6 @@
 package it.tuonome.ortofrutta.auth;
 
 import it.tuonome.ortofrutta.common.BusinessException;
-import it.tuonome.ortofrutta.customer.Customer;
-import it.tuonome.ortofrutta.customer.CustomerRepository;
 import it.tuonome.ortofrutta.config.AppProperties;
 import it.tuonome.ortofrutta.company.CompanyContext;
 import it.tuonome.ortofrutta.company.CompanyMembership;
@@ -37,21 +35,19 @@ public class AuthService {
     private final PasswordEncoder encoder;
     private final JwtEncoder jwtEncoder;
     private final AppProperties props;
-    private final CustomerRepository customers;
     private final RoleRepository roles;
     private final CompanyMembershipRepository memberships;
     private final PasswordResetTokenRepository resetTokens;
     private final JavaMailSender mailSender;
 
     public AuthService(UserRepository users, PasswordEncoder encoder,
-                       JwtEncoder jwtEncoder, AppProperties props, CustomerRepository customers, RoleRepository roles,
+                       JwtEncoder jwtEncoder, AppProperties props, RoleRepository roles,
                        CompanyMembershipRepository memberships, PasswordResetTokenRepository resetTokens,
                        JavaMailSender mailSender) {
         this.users = users;
         this.encoder = encoder;
         this.jwtEncoder = jwtEncoder;
         this.props = props;
-        this.customers = customers;
         this.roles = roles;
         this.memberships = memberships;
         this.resetTokens = resetTokens;
@@ -65,17 +61,19 @@ public class AuthService {
                 .filter(AppUser::isEnabled)
                 .filter(u -> encoder.matches(request.password(), u.getPasswordHash()))
                 .orElseThrow(() -> new BadCredentialsException("Credenziali non valide"));
-        CompanyMembership membership = memberships.findByCompanyAndUserId(CompanyContext.requireId(), user.getId())
-                .orElseThrow(() -> new BadCredentialsException("Account non associato a questa azienda"));
-        if (!membership.isApproved()) {
-            throw new BadCredentialsException("La richiesta di accesso è in attesa di approvazione da parte dell'azienda");
+        CompanyMembership membership = null;
+        if (!user.isCustomerAccount()) {
+            membership = memberships.findByCompanyAndUserId(CompanyContext.requireId(), user.getId())
+                    .orElseThrow(() -> new BadCredentialsException("Account non associato a questa azienda"));
+            if (!membership.isApproved()) {
+                throw new BadCredentialsException("La richiesta di accesso è in attesa di approvazione da parte dell'azienda");
+            }
+            if (!membership.isEnabled()) throw new BadCredentialsException("Account disattivato in questa azienda");
         }
-        if (!membership.isEnabled()) throw new BadCredentialsException("Account disattivato in questa azienda");
 
         Instant now = Instant.now();
         Instant expiresAt = now.plus(props.jwt().expiration());
-        // Il token identifica solo l'utente: ruolo e permessi si rileggono dal database a ogni richiesta,
-        // così un utente disattivato o con permessi cambiati li perde subito.
+        // Il token identifica solo l'utente; i permessi aziendali vengono ricaricati a ogni richiesta.
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer("ortofrutta")
                 .issuedAt(now)
@@ -85,7 +83,10 @@ public class AuthService {
         String token = jwtEncoder
                 .encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
-        return new AuthDtos.LoginResponse(token, expiresAt, AuthDtos.Profile.from(user, membership));
+        AuthDtos.Profile profile = user.isCustomerAccount()
+                ? AuthDtos.Profile.customer(user)
+                : AuthDtos.Profile.from(user, membership);
+        return new AuthDtos.LoginResponse(token, expiresAt, profile);
     }
 
     @Transactional
@@ -93,21 +94,14 @@ public class AuthService {
         String email = request.email().trim().toLowerCase(Locale.ROOT);
         AppRole customerRole = roles.findByCode(AppRole.CUSTOMER_CODE)
                 .orElseThrow(() -> new IllegalStateException("Ruolo Cliente mancante: migrazione V6 non applicata"));
-        AppUser user = users.findByEmailIgnoreCase(email).orElseGet(() -> users.findByUsernameIgnoreCase(email).orElse(null));
-        if (user != null) {
-            if (!encoder.matches(request.password(), user.getPasswordHash())) {
-                throw new BadCredentialsException("Account già esistente: password non valida per associarlo a questa azienda");
-            }
-            if (memberships.existsByCompanyIdAndUserId(CompanyContext.requireId(), user.getId())) {
-                throw new BusinessException("Questo account è già registrato in questa azienda");
-            }
-        } else {
-            user = users.save(new AppUser(email, email, null, encoder.encode(request.password()), customerRole, false));
+        if (users.findByEmailIgnoreCase(email).isPresent() || users.findByUsernameIgnoreCase(email).isPresent()) {
+            throw new BusinessException("Esiste già un account con questa email: accedi con il tuo account cliente");
         }
-        if (user.getDisplayName() == null) user.setDisplayName(request.name());
-        Customer customer = customers.save(new Customer(request.name(), request.phone(), null, null));
-        memberships.save(new CompanyMembership(CompanyContext.requireId(), user, customerRole, customer.getId()));
-        if (user.getCustomerId() == null) user.setCustomerId(customer.getId());
+        AppUser user = new AppUser(email, email, null, encoder.encode(request.password()), customerRole, false);
+        user.setDisplayName(request.name());
+        user.setPhone(request.phone());
+        user.setCustomerAccount(true);
+        users.save(user);
     }
 
     @Transactional
@@ -127,9 +121,12 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public AuthDtos.Profile profile(String username) {
+        AppUser user = users.findByUsername(username)
+                .orElseThrow(() -> new BusinessException("Utente non trovato"));
+        if (user.isCustomerAccount()) return AuthDtos.Profile.customer(user);
         CompanyMembership membership = memberships.findActiveByCompanyAndUsername(CompanyContext.requireId(), username)
                 .orElseThrow(() -> new BusinessException("Utente non trovato in questa azienda"));
-        return AuthDtos.Profile.from(membership.getUser(), membership);
+        return AuthDtos.Profile.from(user, membership);
     }
 
     @Transactional
