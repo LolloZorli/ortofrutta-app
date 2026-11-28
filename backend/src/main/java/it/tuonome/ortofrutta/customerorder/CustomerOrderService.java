@@ -8,6 +8,7 @@ import it.tuonome.ortofrutta.auth.UserRepository;
 import it.tuonome.ortofrutta.auth.AppUser;
 import it.tuonome.ortofrutta.auth.AppRole;
 import it.tuonome.ortofrutta.auth.RoleRepository;
+import it.tuonome.ortofrutta.company.CompanyMembership;
 import it.tuonome.ortofrutta.company.CompanyContext;
 import it.tuonome.ortofrutta.company.CompanyMembershipRepository;
 import it.tuonome.ortofrutta.product.Product;
