@@ -17,7 +17,7 @@ services:
         fromService:
           type: web
           name: ortofrutta-backend
-          property: url
+          envVarKey: RENDER_EXTERNAL_URL
 
   # Spring API. The generated database credentials and JWT key stay in Render's environment.
   - type: web
@@ -51,9 +51,9 @@ services:
         fromService:
           type: web
           name: ortofrutta-frontend
-          property: url
+          envVarKey: RENDER_EXTERNAL_URL
       - key: PASSWORD_RESET_BASE_URL
         fromService:
           type: web
           name: ortofrutta-frontend
-          property: url
+          envVarKey: RENDER_EXTERNAL_URL
