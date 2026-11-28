@@ -109,9 +109,9 @@ Ogni immagine viene pubblicata con un tag corrispondente allo SHA del commit e c
 - **Collaudo**: lavora e verifica le modifiche sul branch `collaudo`. Il push esegue la CI, ma non pubblica immagini né aggiorna Render.
 - **Produzione**: apri una pull request da `collaudo` a `master`. Il merge fa ripartire i controlli; dopo il successo, il workflow pubblica le immagini e Render può distribuire il commit di `master`.
 
-Il file `render.yaml` definisce un frontend statico e un backend Docker; il database di produzione è esterno (Neon). Configura in Render le credenziali del database (`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`) e `ADMIN_PASSWORD`. Render genera `JWT_SECRET`. Usa un secret JWT casuale di almeno 32 caratteri e non riutilizzare credenziali o database di collaudo.
+Il file `render.yaml` definisce un frontend statico e un backend Docker; il database di produzione è esterno (Neon). Configura in Render le credenziali del database (`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`) e `ADMIN_PASSWORD`. Render genera `JWT_SECRET`; il Blueprint valorizza `APP_CORS_ALLOWED_ORIGINS` e `PASSWORD_RESET_BASE_URL` con l'URL del frontend. Il backend usa il profilo `prod`, quindi non carica i dati demo. Mantieni `ADMIN_MUST_CHANGE_PASSWORD=true` e usa password robuste; non riutilizzare credenziali o database di collaudo.
 
-Prima di collegare un database già in uso o applicare migrazioni, fai un backup. Flyway aggiorna lo schema all'avvio del backend. La PWA richiede HTTPS per l'installazione e una connessione al backend per autenticazione e dati.
+Il controllo di salute Render usa `/actuator/health/readiness`; puoi verificare manualmente il backend anche su `/actuator/health`, che deve restituire `{"status":"UP"}`. Dopo il deploy controlla nei log che Flyway abbia completato le migrazioni e che Spring si sia avviato. Prima di collegare un database già in uso o applicare migrazioni, fai un backup. La PWA richiede HTTPS per l'installazione e una connessione al backend per autenticazione e dati.
 
 ## Deploy Kubernetes (opzionale)
 
