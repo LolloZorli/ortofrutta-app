@@ -107,7 +107,10 @@ public class DeliveryService {
                 """).param("companyId", companyId).param("city", city).query((rs, row) ->
                 new ZoneRow(rs.getLong("id"), rs.getString("city"), rs.getBigDecimal("delivery_fee"),
                         rs.getBigDecimal("minimum_order_subtotal"))).optional()
-                .orElseThrow(() -> new BusinessException("Non effettuiamo consegne nella città indicata"));
+                .orElse(null);
+        if (zone == null) {
+            return new DeliveryDtos.Terms(null, null, null, BigDecimal.ZERO);
+        }
         if (subtotal.compareTo(zone.minimum()) < 0) {
             throw new BusinessException("L'importo minimo per la consegna è " + zone.minimum());
         }

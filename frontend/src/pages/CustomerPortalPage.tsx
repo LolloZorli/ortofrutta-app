@@ -101,11 +101,10 @@ export default function CustomerPortalPage() {
       return toast.error('Per la consegna indica indirizzo, città, CAP e telefono')
     }
     if (fulfillmentType === 'DELIVERY') {
-      if (!deliveryOptions.data?.zoneAvailable) return toast.error('Non effettuiamo consegne nella città indicata')
-      if (productSubtotal < deliveryOptions.data.minimumOrderSubtotal) {
+      if (deliveryOptions.data?.zoneAvailable && productSubtotal < deliveryOptions.data.minimumOrderSubtotal) {
         return toast.error(`L'importo minimo per la consegna è ${eur(deliveryOptions.data.minimumOrderSubtotal)}`)
       }
-      if (!deliveryOptions.data.slots.some((slot) => String(slot.id) === deliverySlotId)) {
+      if (deliveryOptions.data?.zoneAvailable && !deliveryOptions.data.slots.some((slot) => String(slot.id) === deliverySlotId)) {
         return toast.error('Scegli una fascia oraria disponibile')
       }
     }
@@ -118,7 +117,7 @@ export default function CustomerPortalPage() {
         deliveryPostalCode: fulfillmentType === 'DELIVERY' ? deliveryPostalCode.trim() : null,
         deliveryPhone: fulfillmentType === 'DELIVERY' ? deliveryPhone.trim() : null,
         deliveryNotes: fulfillmentType === 'DELIVERY' ? deliveryNotes.trim() || null : null,
-        deliverySlotId: fulfillmentType === 'DELIVERY' ? Number(deliverySlotId) : null,
+        deliverySlotId: fulfillmentType === 'DELIVERY' && deliverySlotId ? Number(deliverySlotId) : null,
       })
       setQuantities({}); setBasketProducts({}); setNotes(''); setPickupDate(''); setDeliveryNotes(''); setDeliverySlotId('')
       orders.reload()
@@ -203,7 +202,9 @@ export default function CustomerPortalPage() {
               </option>)}
             </select></Field>
             {deliveryOptions.data.slots.length === 0 && <div className="item-sub">Nessuna fascia disponibile per questa data.</div>}
-          </> : deliveryCity.trim() && pickupDate && !deliveryOptions.loading ? <div className="item-sub">Nessuna zona attiva per questa città.</div> : null}
+          </> : deliveryCity.trim() && pickupDate && !deliveryOptions.loading
+            ? <div className="item-sub">Consegna disponibile · prezzo da confermare con il negozio</div>
+            : null}
           <div className="price-line"><span>Totale ordine</span><strong>{eur(productSubtotal + (deliveryOptions.data?.zoneAvailable ? deliveryOptions.data.deliveryFee : 0))}</strong></div>
         </>}
         <Field label="Note per il negozio"><textarea rows={2} maxLength={500} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Orario preferito o richieste" /></Field>

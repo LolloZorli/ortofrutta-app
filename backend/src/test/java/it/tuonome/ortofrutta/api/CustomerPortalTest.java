@@ -24,6 +24,28 @@ class CustomerPortalTest extends IntegrationTestBase {
     private static final String JSON = MediaType.APPLICATION_JSON_VALUE;
 
     @Test
+    void customerCanRequestDeliveryForACityWithoutAConfiguredZone() throws Exception {
+        String admin = admin();
+        long productId = createProduct(admin, "Consegna libera " + System.nanoTime(), "KG", "2.00", "IVA_4");
+        receive(admin, productId, "10", "1.00");
+        String email = "consegna-libera-" + System.nanoTime() + "@example.test";
+        registerCustomer("Cliente Consegna Libera", email);
+        String customer = login(email, "password123");
+
+        mvc.perform(post("/api/customer-orders/mine").header(AUTH, customer).contentType(JSON)
+                        .content("""
+                                {"pickupDate":"%s","lines":[{"productId":%d,"quantity":2}],
+                                 "fulfillmentType":"DELIVERY","deliveryAddress":"Via Nuova 4",
+                                 "deliveryCity":"Citta Non Configurata","deliveryPostalCode":"10100",
+                                 "deliveryPhone":"3331234567","deliverySlotId":null}
+                                """.formatted(LocalDate.now().plusDays(1), productId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fulfillmentType").value("DELIVERY"))
+                .andExpect(jsonPath("$.deliveryFee").value(0))
+                .andExpect(jsonPath("$.total").value(4.00));
+    }
+
+    @Test
     void customerCanBrowseCatalogAndCreateAnOrderAtThePublishedPrice() throws Exception {
         String admin = admin();
         long productId = createProduct(admin, "Catalogo cliente " + System.nanoTime(), "KG", "3.40", "IVA_4");
