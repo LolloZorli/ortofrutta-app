@@ -3,17 +3,12 @@ import { api, companySession, errorMessage } from '../api'
 import { useAuth } from '../auth'
 import type { CompanyShop } from '../types'
 
-type Mode = 'login' | 'customer' | 'employee' | 'company' | 'forgot' | 'reset'
-
-const MODES: { id: Mode; icon: string; label: string }[] = [
-  { id: 'login', icon: '↪', label: 'Accedi' },
-  { id: 'customer', icon: '🧺', label: 'Cliente' },
-  { id: 'employee', icon: '🧾', label: 'Commesso' },
-  { id: 'company', icon: '🏪', label: 'Azienda' },
-]
+type AccountType = 'customer' | 'store'
+type Mode = 'login' | 'customer-register' | 'employee-request' | 'company-register' | 'forgot' | 'reset'
 
 export default function LoginPage() {
   const { login } = useAuth()
+  const [accountType, setAccountType] = useState<AccountType>('customer')
   const [mode, setMode] = useState<Mode>('login')
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -41,6 +36,13 @@ export default function LoginPage() {
     }
   }, [])
 
+  function selectAccount(next: AccountType) {
+    setAccountType(next)
+    setMode('login')
+    setError(null)
+    setNotice(null)
+  }
+
   function selectMode(next: Mode) {
     setMode(next)
     setError(null)
@@ -53,9 +55,8 @@ export default function LoginPage() {
     setError(null)
     setNotice(null)
     try {
-      if (mode === 'customer') companySession.select('')
-      else if (mode === 'company' || mode === 'employee' || companySlug) companySession.select(companySlug)
-      else companySession.select('')
+      if (accountType === 'customer' || mode === 'customer-register') companySession.select('')
+      else if (companySlug) companySession.select(companySlug)
 
       if (mode === 'forgot') {
         await api.post('/auth/forgot-password', { email: email.trim() })
@@ -70,23 +71,23 @@ export default function LoginPage() {
         setPassword('')
         setMode('login')
         setNotice('Password aggiornata. Ora puoi accedere.')
-      } else if (mode === 'company') {
+      } else if (mode === 'company-register') {
         await api.post('/companies/register', {
           companyName: companyName.trim(), slug: companySlug.trim(), ownerName: name.trim(),
           email: email.trim(), password, phone: phone.trim() || null,
         })
         await login(email.trim(), password)
-      } else if (mode === 'customer') {
+      } else if (mode === 'customer-register') {
         await api.post('/auth/register', { name: name.trim(), email: email.trim(), phone: phone.trim() || null, password })
         await login(email.trim(), password)
-      } else if (mode === 'employee') {
+      } else if (mode === 'employee-request') {
         const response = await api.post<{ message: string }>('/auth/register-employee', {
           name: name.trim(), email: email.trim(), phone: phone.trim() || null, password,
         })
         setUsername(email.trim())
         setPassword('')
         setMode('login')
-        setNotice(response.message || 'Richiesta inviata. Potrai accedere dopo l’approvazione dell’azienda.')
+        setNotice(response.message || 'Richiesta inviata. L’azienda attiverà il tuo accesso.')
       } else {
         await login(username.trim(), password)
       }
@@ -97,92 +98,111 @@ export default function LoginPage() {
     }
   }
 
-  const registering = mode !== 'login' && mode !== 'forgot' && mode !== 'reset'
-  const companyRegistration = mode === 'company'
-  const employeeRegistration = mode === 'employee'
+  const specialMode = mode === 'forgot' || mode === 'reset'
+  const registering = mode === 'customer-register' || mode === 'employee-request' || mode === 'company-register'
 
   return (
     <main className="login">
       <form className="card login-card" onSubmit={submit}>
-        <img className="login-logo" src="/icon.svg" alt="" />
-        <h1 className="center">Ortofrutta</h1>
-        <p className="muted center">Frutta fresca, ordini semplici.</p>
+        <div className="login-brand">
+          <img className="login-logo" src="/icon.svg" alt="Ortofrutta" />
+          <div>
+            <h1>Ortofrutta</h1>
+            <p>Fresco, semplice, vicino a te.</p>
+          </div>
+        </div>
 
-        {(mode !== 'forgot' && mode !== 'reset') && (
-          <div className="auth-modes" role="tablist" aria-label="Tipo di accesso">
-            {MODES.map((item) => <button key={item.id} type="button" role="tab" aria-selected={mode === item.id}
-              className={`auth-mode${mode === item.id ? ' active' : ''}`} onClick={() => selectMode(item.id)}>
-              <span>{item.icon}</span>{item.label}
-            </button>)}
+        {!specialMode && (
+          <div className="account-switch" role="tablist" aria-label="Tipo di account">
+            <button type="button" role="tab" aria-selected={accountType === 'customer'}
+              className={accountType === 'customer' ? 'active' : ''} onClick={() => selectAccount('customer')}>
+              Sono cliente
+            </button>
+            <button type="button" role="tab" aria-selected={accountType === 'store'}
+              className={accountType === 'store' ? 'active' : ''} onClick={() => selectAccount('store')}>
+              Sono del negozio
+            </button>
           </div>
         )}
 
-        {(mode === 'login' || mode === 'employee') && <label className="field"><span>Negozio{mode === 'employee' ? '' : ' (facoltativo per i clienti)'}</span>
-          <select value={companySlug} onChange={(e) => setCompanySlug(e.target.value)} required={mode === 'employee'}>
-            <option value="">Seleziona un negozio</option>
-            {shops.map((shop) => <option key={shop.id} value={shop.slug}>{shop.name}</option>)}
-          </select>
-          {mode === 'login' && <small className="muted">I clienti possono accedere senza selezionarlo e scegliere il negozio dopo.</small>}
-          {shops.length === 0 && <small className="muted">Se non trovi il negozio, aggiorna la pagina.</small>}
-        </label>}
-
-        {companyRegistration && <>
-          <label className="field"><span>Nome dell’azienda</span><input value={companyName} onChange={(e) => setCompanyName(e.target.value)} autoComplete="organization" required /></label>
-          <label className="field"><span>Indirizzo del negozio</span><input value={companySlug} onChange={(e) => setCompanySlug(e.target.value.toLowerCase())} pattern="[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*" minLength={3} maxLength={80} placeholder="es. frutta-rossi" required /></label>
-        </>}
-
-        {registering && <label className="field"><span>{companyRegistration ? 'Nome titolare' : 'Nome e cognome'}</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={120} required />
-        </label>}
+        {mode === 'customer-register' && <p className="login-kicker">Crea il tuo account una sola volta. Poi potrai scegliere qualsiasi negozio.</p>}
+        {mode === 'employee-request' && <p className="login-kicker">Richiedi l’accesso al negozio. Non servirà creare account in due negozi diversi.</p>}
+        {mode === 'company-register' && <p className="login-kicker">Crea lo spazio della tua azienda e accedi come titolare.</p>}
 
         {mode === 'forgot' ? (
           <label className="field"><span>Email</span>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email" maxLength={254} required />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" maxLength={254} required />
           </label>
         ) : mode === 'reset' ? (
           <label className="field"><span>Nuova password (almeno 8 caratteri)</span>
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-              autoComplete="new-password" minLength={8} maxLength={72} required />
+            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" minLength={8} maxLength={72} required />
           </label>
         ) : (
-          <label className="field"><span>{registering ? 'Email' : 'Email o nome utente'}</span>
-            <input type={registering ? 'email' : 'text'} value={registering ? email : username}
-              onChange={(e) => registering ? setEmail(e.target.value) : setUsername(e.target.value)}
-              autoComplete="username" autoCapitalize="none" required />
-          </label>
+          <>
+            {accountType === 'store' && mode === 'login' && (
+              <label className="field"><span>Negozio</span>
+                <select value={companySlug} onChange={(e) => setCompanySlug(e.target.value)} required>
+                  <option value="">Seleziona il tuo negozio</option>
+                  {shops.map((shop) => <option key={shop.id} value={shop.slug}>{shop.name}</option>)}
+                </select>
+              </label>
+            )}
+            {mode === 'company-register' && <>
+              <label className="field"><span>Nome dell’azienda</span>
+                <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} autoComplete="organization" required />
+              </label>
+              <label className="field"><span>Codice del negozio</span>
+                <input value={companySlug} onChange={(e) => setCompanySlug(e.target.value.toLowerCase())} pattern="[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*" minLength={3} maxLength={80} placeholder="es. frutta-rossi" required />
+              </label>
+            </>}
+            {registering && (
+              <label className="field"><span>{mode === 'company-register' ? 'Nome titolare' : 'Nome e cognome'}</span>
+                <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={120} required />
+              </label>
+            )}
+            <label className="field"><span>{registering ? 'Email' : 'Email o nome utente'}</span>
+              <input type={registering ? 'email' : 'text'} value={registering ? email : username}
+                onChange={(e) => registering ? setEmail(e.target.value) : setUsername(e.target.value)}
+                autoComplete={registering ? 'email' : 'username'} autoCapitalize="none" required />
+            </label>
+            {(mode === 'customer-register' || mode === 'company-register' || mode === 'employee-request') && (
+              <label className="field"><span>Telefono <small>(facoltativo)</small></span>
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" inputMode="tel" maxLength={30} />
+              </label>
+            )}
+            <label className="field"><span>Password{registering ? ' (almeno 8 caratteri)' : ''}</span>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                autoComplete={registering ? 'new-password' : 'current-password'} minLength={registering ? 8 : undefined} required />
+            </label>
+          </>
         )}
 
-        {(mode === 'customer' || companyRegistration) && <label className="field"><span>Telefono (facoltativo)</span>
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" inputMode="tel" maxLength={30} />
-        </label>}
-
-        {(mode !== 'forgot' && mode !== 'reset') && (
-          <label className="field"><span>Password{registering ? ' (almeno 8 caratteri)' : ''}</span>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              autoComplete={registering ? 'new-password' : 'current-password'} minLength={registering ? 8 : undefined} required />
-          </label>
-        )}
-
-        {employeeRegistration && <p className="notice">L’azienda approverà la richiesta prima di attivare il tuo accesso.</p>}
         {notice && <p className="notice success" role="status">{notice}</p>}
         {error && <p className="tone-bad" role="alert">{error}</p>}
 
-        <button className="btn btn-primary btn-block" disabled={busy}>
+        <button className="btn btn-primary btn-block login-submit" disabled={busy}>
           {busy ? 'Attendi…'
             : mode === 'login' ? 'Accedi'
-            : mode === 'forgot' ? 'Invia link di reset'
+            : mode === 'forgot' ? 'Invia link'
             : mode === 'reset' ? 'Aggiorna password'
-            : mode === 'customer' ? 'Crea account cliente'
-            : mode === 'employee' ? 'Invia richiesta commesso'
+            : mode === 'customer-register' ? 'Crea account cliente'
+            : mode === 'employee-request' ? 'Invia richiesta'
             : 'Crea spazio aziendale'}
         </button>
-        {mode === 'login' && (
-          <button type="button" className="btn btn-block" onClick={() => selectMode('forgot')}>
-            Password dimenticata
-          </button>
+
+        {mode === 'login' && accountType === 'customer' && (
+          <div className="login-actions">
+            <button type="button" className="link-button" onClick={() => selectMode('customer-register')}>Non hai un account? Registrati</button>
+            <button type="button" className="link-button" onClick={() => selectMode('forgot')}>Password dimenticata</button>
+          </div>
         )}
-        {(mode === 'forgot' || mode === 'reset') && (
+        {mode === 'login' && accountType === 'store' && (
+          <div className="login-actions">
+            <button type="button" className="link-button" onClick={() => selectMode('employee-request')}>Richiedi accesso commesso</button>
+            <button type="button" className="link-button" onClick={() => selectMode('company-register')}>Registra un negozio</button>
+          </div>
+        )}
+        {(registering || mode === 'forgot' || mode === 'reset') && (
           <button type="button" className="btn btn-block" onClick={() => selectMode('login')}>
             Torna all'accesso
           </button>
