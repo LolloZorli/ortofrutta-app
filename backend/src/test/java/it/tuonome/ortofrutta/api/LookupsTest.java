@@ -23,32 +23,37 @@ class LookupsTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.VAT_RATE[?(@.code == 'IVA_4')].rate").value(4.0))
                 .andExpect(jsonPath("$.PAYMENT_METHOD[?(@.code == 'CASH')]").isNotEmpty())
                 .andExpect(jsonPath("$.WASTE_REASON[?(@.code == 'SCADUTO')]").isNotEmpty())
-                .andExpect(jsonPath("$.SUPPLIER_TYPE[?(@.code == 'WHOLESALER')]").isNotEmpty());
+                .andExpect(jsonPath("$.SUPPLIER_TYPE[?(@.code == 'WHOLESALER')]").isNotEmpty())
+                .andExpect(jsonPath("$.REGION[?(@.code == 'LAZIO')]").isNotEmpty())
+                .andExpect(jsonPath("$.CITY[?(@.code == 'CITY_H501')]").isNotEmpty())
+                .andExpect(jsonPath("$.STREET_TYPE[?(@.code == 'VIA')]").isNotEmpty());
     }
 
     @Test
     void adminAddsAValueAndEveryoneCanThenUseIt() throws Exception {
         String admin = admin();
+        String name = "Frutta speciale " + System.nanoTime();
         mvc.perform(post("/api/admin/lookups/CATEGORY").header(AUTH, admin).contentType(JSON)
-                        .content("{\"name\":\"Frutta secca\"}"))
+                        .content("{\"name\":\"" + name + "\"}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.code").value("FRUTTA_SECCA"))
+                .andExpect(jsonPath("$.name").value(name))
                 .andExpect(jsonPath("$.active").value(true));
 
         String staff = readyUser(admin, "lookupstaff", "STAFF");
         mvc.perform(get("/api/lookups").header(AUTH, staff))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.CATEGORY[?(@.code == 'FRUTTA_SECCA')]").isNotEmpty());
+                .andExpect(jsonPath("$.CATEGORY[?(@.name == '" + name + "')]").isNotEmpty());
     }
 
     @Test
     void duplicateNamesAreRejectedIgnoringCase() throws Exception {
         String admin = admin();
+        String name = "Origine unica " + System.nanoTime();
         mvc.perform(post("/api/admin/lookups/ORIGIN").header(AUTH, admin).contentType(JSON)
-                        .content("{\"name\":\"Puglia\"}"))
+                        .content("{\"name\":\"" + name + "\"}"))
                 .andExpect(status().isCreated());
         mvc.perform(post("/api/admin/lookups/ORIGIN").header(AUTH, admin).contentType(JSON)
-                        .content("{\"name\":\"PUGLIA\"}"))
+                        .content("{\"name\":\"" + name.toUpperCase() + "\"}"))
                 .andExpect(status().isConflict());
     }
 

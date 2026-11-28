@@ -1,6 +1,8 @@
 -- Valori iniziali completi per le tipologiche operative.
 -- ON CONFLICT evita duplicati nei negozi già esistenti.
 
+ALTER TABLE supplier_types ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
+
 INSERT INTO product_categories(company_id, code, name, sort_order, active)
 SELECT c.id, v.code, v.name, v.sort_order, TRUE
 FROM companies c CROSS JOIN (VALUES
