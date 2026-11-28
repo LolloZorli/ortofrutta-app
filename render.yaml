@@ -26,7 +26,7 @@ services:
     branch: master
     dockerfilePath: backend/Dockerfile
     dockerContext: backend
-    plan: 1c-2g
+    plan: free
     region: frankfurt
     healthCheckPath: /actuator/health/readiness
     autoDeployTrigger: checksPass
