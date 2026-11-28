@@ -3,7 +3,7 @@ import { api, errorMessage } from '../api'
 import Modal from '../components/Modal'
 import ProductSelect from '../components/ProductSelect'
 import { Chip, Empty, ErrorBox, Field, Loading } from '../components/ui'
-import { dateIt, eur, parseDecimal, qty, tomorrowIso } from '../format'
+import { dateIt, eur, parseDecimal, qty, roundMoney, tomorrowIso } from '../format'
 import { useLoad } from '../hooks'
 import { optionsWithCurrent, useLookups } from '../lookups'
 import { useToast } from '../toast'
@@ -241,7 +241,7 @@ function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
       return toast.error('Per la consegna indica via, provincia, città, CAP e telefono')
     }
     if (fulfillmentType === 'DELIVERY') {
-      if (deliveryOptions.data?.zoneAvailable && productSubtotal < deliveryOptions.data.minimumOrderSubtotal) {
+      if (deliveryOptions.data?.zoneAvailable && roundMoney(productSubtotal) < deliveryOptions.data.minimumOrderSubtotal) {
         return toast.error(`L'importo minimo per la consegna è ${eur(deliveryOptions.data.minimumOrderSubtotal)}`)
       }
       if (deliveryOptions.data?.zoneAvailable && !deliveryOptions.data.slots.some((slot) => String(slot.id) === deliverySlotId)) {

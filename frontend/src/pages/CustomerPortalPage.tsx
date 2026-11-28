@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, companySession, errorMessage } from '../api'
 import { useAuth } from '../auth'
 import { Chip, Empty, ErrorBox, Field, Loading } from '../components/ui'
-import { eur, qty, todayIso } from '../format'
+import { eur, qty, roundMoney, todayIso } from '../format'
 import { useLoad } from '../hooks'
 import { optionsWithCurrent, useLookups } from '../lookups'
 import { useToast } from '../toast'
@@ -111,7 +111,7 @@ export default function CustomerPortalPage() {
       return toast.error('Per la consegna indica via, provincia, città, CAP e telefono')
     }
     if (fulfillmentType === 'DELIVERY') {
-      if (deliveryOptions.data?.zoneAvailable && productSubtotal < deliveryOptions.data.minimumOrderSubtotal) {
+      if (deliveryOptions.data?.zoneAvailable && roundMoney(productSubtotal) < deliveryOptions.data.minimumOrderSubtotal) {
         return toast.error(`L'importo minimo per la consegna è ${eur(deliveryOptions.data.minimumOrderSubtotal)}`)
       }
       if (deliveryOptions.data?.zoneAvailable && !deliveryOptions.data.slots.some((slot) => String(slot.id) === deliverySlotId)) {
