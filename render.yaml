@@ -52,3 +52,8 @@ services:
           type: web
           name: ortofrutta-frontend
           property: url
+      - key: PASSWORD_RESET_BASE_URL
+        fromService:
+          type: web
+          name: ortofrutta-frontend
+          property: url
