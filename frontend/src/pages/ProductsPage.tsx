@@ -44,8 +44,8 @@ export default function ProductsPage() {
 
   return (
     <div className="stack">
-      <div className="row">
-        <input className="grow" placeholder="Cerca prodotto…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="page-toolbar">
+        <input className="toolbar-search" placeholder="Cerca prodotto…" value={search} onChange={(e) => setSearch(e.target.value)} />
         <button className="btn" onClick={printLabels}>Stampa cartellini</button>
         <button className="btn btn-primary" onClick={() => setEditing('new')}>
           + Nuovo

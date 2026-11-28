@@ -23,7 +23,9 @@ export const dateTimeIt = (iso: string) =>
 /** Converte un testo digitato ("1,5" oppure "1.5") in numero; NaN se non valido. */
 export const parseDecimal = (s: string): number => {
   const t = s.trim().replace(',', '.')
-  return t === '' ? NaN : Number(t)
+  if (t === '') return NaN
+  const value = Number(t)
+  return Number.isFinite(value) ? value : NaN
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')

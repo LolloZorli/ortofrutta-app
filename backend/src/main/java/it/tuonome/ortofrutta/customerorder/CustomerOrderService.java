@@ -6,6 +6,8 @@ import it.tuonome.ortofrutta.customer.Customer;
 import it.tuonome.ortofrutta.customer.CustomerRepository;
 import it.tuonome.ortofrutta.auth.UserRepository;
 import it.tuonome.ortofrutta.auth.AppUser;
+import it.tuonome.ortofrutta.auth.AppRole;
+import it.tuonome.ortofrutta.auth.RoleRepository;
 import it.tuonome.ortofrutta.company.CompanyContext;
 import it.tuonome.ortofrutta.company.CompanyMembershipRepository;
 import it.tuonome.ortofrutta.product.Product;
@@ -43,12 +45,14 @@ public class CustomerOrderService {
     private final LookupService lookups;
     private final UserRepository users;
     private final CompanyMembershipRepository memberships;
+    private final RoleRepository roles;
     private final JdbcClient jdbc;
     private final DeliveryService delivery;
 
     public CustomerOrderService(CustomerOrderRepository orders, CustomerRepository customers,
                                 ProductRepository products, SaleService sales, LookupService lookups, UserRepository users,
-                                CompanyMembershipRepository memberships, JdbcClient jdbc, DeliveryService delivery) {
+                                CompanyMembershipRepository memberships, RoleRepository roles, JdbcClient jdbc,
+                                DeliveryService delivery) {
         this.orders = orders;
         this.customers = customers;
         this.products = products;
@@ -56,6 +60,7 @@ public class CustomerOrderService {
         this.lookups = lookups;
         this.users = users;
         this.memberships = memberships;
+        this.roles = roles;
         this.jdbc = jdbc;
         this.delivery = delivery;
     }
@@ -69,7 +74,14 @@ public class CustomerOrderService {
     }
 
     public List<CustomerOrderDtos.Response> myOrders(String username) {
-        Long customerId = customerIdFor(username);
+        AppUser user = users.findByUsername(username).orElseThrow(() -> new NotFoundException("Account", null));
+        CompanyMembership membership = memberships.findByCompanyAndUserId(CompanyContext.requireId(), user.getId())
+                .orElse(null);
+        if (membership == null || membership.getCustomerId() == null) return List.of();
+        if (!membership.isEnabled() || !membership.isApproved()) {
+            throw new BusinessException("Account cliente disattivato in questo negozio");
+        }
+        Long customerId = membership.getCustomerId();
         return orders.findAllByCustomerIdOrderByCreatedAtDesc(customerId).stream()
                 .map(o -> CustomerOrderDtos.Response.from(o, lookups)).toList();
     }
@@ -201,11 +213,29 @@ public class CustomerOrderService {
     }
 
     private Long customerIdFor(String username) {
-        AppUser user = users.findByUsername(username).orElseThrow(() -> new NotFoundException("Account", null));
-        Long customerId = memberships.findActiveByCompanyAndUserId(CompanyContext.requireId(), user.getId())
-                .map(m -> m.getCustomerId()).orElse(null);
-        if (customerId == null) throw new BusinessException("L'account non è collegato a un profilo cliente in questa azienda");
-        return customerId;
+        AppUser user = users.findByUsernameForUpdate(username)
+                .orElseThrow(() -> new NotFoundException("Account", null));
+        if (!user.isCustomerAccount()) throw new BusinessException("L'account non è un account cliente");
+
+        CompanyMembership membership = memberships.findByCompanyAndUserId(CompanyContext.requireId(), user.getId())
+                .orElse(null);
+        if (membership != null) {
+            if (!membership.isEnabled() || !membership.isApproved()) {
+                throw new BusinessException("Account cliente disattivato in questo negozio");
+            }
+            if (membership.getCustomerId() != null) return membership.getCustomerId();
+            Customer customer = customers.save(new Customer(user.getDisplayName() == null
+                    ? user.getUsername() : user.getDisplayName(), user.getPhone(), null, null));
+            membership.setCustomerId(customer.getId());
+            return customer.getId();
+        }
+
+        AppRole customerRole = roles.findByCode(AppRole.CUSTOMER_CODE)
+                .orElseThrow(() -> new IllegalStateException("Ruolo Cliente mancante per questo negozio"));
+        Customer customer = customers.save(new Customer(user.getDisplayName() == null
+                ? user.getUsername() : user.getDisplayName(), user.getPhone(), null, null));
+        memberships.save(new CompanyMembership(CompanyContext.requireId(), user, customerRole, customer.getId()));
+        return customer.getId();
     }
 
     private static void validateDelivery(FulfillmentType type, String address, String city, String postalCode, String phone) {

@@ -50,6 +50,9 @@ public class CompanyService {
         }
 
         AppUser owner = users.findByEmailIgnoreCase(email).orElseGet(() -> users.findByUsernameIgnoreCase(email).orElse(null));
+        if (owner != null && owner.isCustomerAccount()) {
+            throw new BusinessException("Un account cliente non può essere usato come account aziendale");
+        }
         if (owner != null && !encoder.matches(request.password(), owner.getPasswordHash())) {
             throw new BusinessException("Account esistente: password non valida per creare una nuova azienda");
         }

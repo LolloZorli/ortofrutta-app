@@ -392,6 +392,24 @@ textarea:focus {
 .line-row.with-cost {
   grid-template-columns: 1fr 80px 80px 36px;
 }
+.page-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+.toolbar-search {
+  min-width: 0;
+}
+.table-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.table-scroll .table {
+  min-width: 420px;
+}
 
 /* ---------- modal ---------- */
 .backdrop {
@@ -407,6 +425,7 @@ textarea:focus {
   width: 100%;
   max-width: 560px;
   max-height: 92vh;
+  max-height: 92dvh;
   display: flex;
   flex-direction: column;
   background: var(--card);
@@ -1024,8 +1043,25 @@ textarea:focus {
     padding-left: 12px;
     padding-right: 12px;
   }
+  .topbar h1 {
+    min-width: 0;
+    flex: 1;
+    font-size: 0.96rem;
+  }
+  .topbar h1 > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .topbar-user .user-label {
     display: none;
+  }
+  .topbar-user .user-avatar {
+    display: none;
+  }
+  .topbar-user .btn {
+    padding: 8px 10px;
+    white-space: nowrap;
   }
   .tabbar {
     left: 6px;
@@ -1040,8 +1076,31 @@ textarea:focus {
   .cart-line > .grow {
     flex-basis: calc(100% - 48px);
   }
+  .page-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .page-toolbar .toolbar-search {
+    grid-column: 1 / -1;
+  }
+  .line-row {
+    grid-template-columns: minmax(0, 1fr) 68px 40px;
+  }
+  .line-row.with-cost {
+    grid-template-columns: minmax(0, 1fr) 62px 62px 40px;
+  }
   .login-card {
     padding: 24px 20px;
+  }
+}
+
+@media (max-width: 760px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  .btn-sm {
+    min-height: 44px;
   }
 }
 

@@ -53,8 +53,9 @@ export default function LoginPage() {
     setError(null)
     setNotice(null)
     try {
-      if (mode !== 'company') companySession.select(companySlug)
-      else companySession.select(companySlug)
+      if (mode === 'customer') companySession.select('')
+      else if (mode === 'company' || mode === 'employee' || companySlug) companySession.select(companySlug)
+      else companySession.select('')
 
       if (mode === 'forgot') {
         await api.post('/auth/forgot-password', { email: email.trim() })
@@ -116,12 +117,13 @@ export default function LoginPage() {
           </div>
         )}
 
-        {mode !== 'company' && mode !== 'forgot' && mode !== 'reset' && <label className="field"><span>Negozio</span>
-          <select value={companySlug} onChange={(e) => setCompanySlug(e.target.value)} required>
+        {(mode === 'login' || mode === 'employee') && <label className="field"><span>Negozio{mode === 'employee' ? '' : ' (facoltativo per i clienti)'}</span>
+          <select value={companySlug} onChange={(e) => setCompanySlug(e.target.value)} required={mode === 'employee'}>
+            <option value="">Seleziona un negozio</option>
             {shops.map((shop) => <option key={shop.id} value={shop.slug}>{shop.name}</option>)}
-            {!shops.some((shop) => shop.slug === companySlug) && <option value={companySlug}>{companySlug}</option>}
           </select>
-          {shops.length === 0 && <small className="muted">Se non trovi il negozio, aggiorna la pagina o chiedi il suo indirizzo.</small>}
+          {mode === 'login' && <small className="muted">I clienti possono accedere senza selezionarlo e scegliere il negozio dopo.</small>}
+          {shops.length === 0 && <small className="muted">Se non trovi il negozio, aggiorna la pagina.</small>}
         </label>}
 
         {companyRegistration && <>

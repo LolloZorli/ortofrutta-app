@@ -51,7 +51,7 @@ export default function Layout() {
       <header className="topbar">
         <h1>
           <img src="/icon.svg" alt="" />
-          {TITLES[pathname] ?? 'Ortofrutta'}
+          <span>{TITLES[pathname] ?? 'Ortofrutta'}</span>
         </h1>
         {profile && (
           <div className="topbar-user">
@@ -60,8 +60,8 @@ export default function Layout() {
               <strong>{profile.username}</strong>
               <small>{profile.roleName}</small>
             </span>
-            <button className="btn btn-sm" onClick={logout} aria-label={profile.roleCode === 'CUSTOMER' ? 'Cambia negozio' : 'Esci dall’account'}>
-              {profile.roleCode === 'CUSTOMER' ? 'Cambia negozio' : 'Esci'}
+            <button className="btn btn-sm" onClick={logout} aria-label="Esci dall’account">
+              Esci
             </button>
           </div>
         )}
