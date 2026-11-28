@@ -3,6 +3,8 @@ package it.tuonome.ortofrutta.delivery;
 import it.tuonome.ortofrutta.common.BusinessException;
 import it.tuonome.ortofrutta.common.NotFoundException;
 import it.tuonome.ortofrutta.company.CompanyContext;
+import it.tuonome.ortofrutta.lookup.LookupService;
+import it.tuonome.ortofrutta.lookup.LookupType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,9 +17,11 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class DeliveryService {
     private final JdbcClient jdbc;
+    private final LookupService lookups;
 
-    public DeliveryService(JdbcClient jdbc) {
+    public DeliveryService(JdbcClient jdbc, LookupService lookups) {
         this.jdbc = jdbc;
+        this.lookups = lookups;
     }
 
     public List<DeliveryDtos.ZoneResponse> listZones() {
@@ -67,6 +71,9 @@ public class DeliveryService {
         if (city == null || city.isBlank() || date == null) {
             return new DeliveryDtos.OptionsResponse(false, city, BigDecimal.ZERO, BigDecimal.ZERO, List.of());
         }
+        if (!lookups.hasActiveName(LookupType.CITY, city)) {
+            return new DeliveryDtos.OptionsResponse(false, city, BigDecimal.ZERO, BigDecimal.ZERO, List.of());
+        }
         long companyId = CompanyContext.requireId();
         var zone = jdbc.sql("""
                 select id, city, delivery_fee, minimum_order_subtotal
@@ -100,6 +107,9 @@ public class DeliveryService {
     @Transactional
     public DeliveryDtos.Terms reserve(String city, LocalDate date, Long slotId, BigDecimal subtotal) {
         long companyId = CompanyContext.requireId();
+        if (!lookups.hasActiveName(LookupType.CITY, city)) {
+            throw new BusinessException("Le consegne sono disponibili solo per le città del Lazio");
+        }
         ZoneRow zone = jdbc.sql("""
                 select id, city, delivery_fee, minimum_order_subtotal from delivery_zones
                 where company_id = :companyId and active and lower(trim(city)) = lower(trim(:city))
@@ -109,6 +119,9 @@ public class DeliveryService {
                         rs.getBigDecimal("minimum_order_subtotal"))).optional()
                 .orElse(null);
         if (zone == null) {
+            if (!lookups.hasActiveName(LookupType.CITY, city)) {
+                throw new BusinessException("Le consegne sono disponibili solo per le città del Lazio");
+            }
             return new DeliveryDtos.Terms(null, null, null, BigDecimal.ZERO);
         }
         if (subtotal.compareTo(zone.minimum()) < 0) {

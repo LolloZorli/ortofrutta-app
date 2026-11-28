@@ -85,6 +85,10 @@ export type LookupTypeName =
   | 'PAYMENT_METHOD'
   | 'CUSTOMER_TYPE'
   | 'SUPPLIER_TYPE'
+  | 'REGION'
+  | 'PROVINCE'
+  | 'CITY'
+  | 'STREET_TYPE'
 
 export interface LookupItem {
   id: number

@@ -4,6 +4,7 @@ import Modal from '../components/Modal'
 import { Chip, Empty, ErrorBox, Field, Loading } from '../components/ui'
 import { eur } from '../format'
 import { useLoad } from '../hooks'
+import { optionsWithCurrent, useLookups } from '../lookups'
 import { useToast } from '../toast'
 import type { DeliverySlot, DeliveryZone } from '../types'
 
@@ -43,6 +44,7 @@ export default function DeliverySettingsPage() {
 
 function ZoneForm({ zone, onClose, onSaved }: { zone: DeliveryZone | null; onClose: () => void; onSaved: () => void }) {
   const toast = useToast()
+  const { lookups } = useLookups()
   const [city, setCity] = useState(zone?.city ?? '')
   const [fee, setFee] = useState(String(zone?.deliveryFee ?? 0))
   const [minimum, setMinimum] = useState(String(zone?.minimumOrderSubtotal ?? 0))
@@ -82,7 +84,10 @@ function ZoneForm({ zone, onClose, onSaved }: { zone: DeliveryZone | null; onClo
 
   return <Modal title={zone ? `Zona: ${zone.city}` : 'Nuova zona di consegna'} onClose={onClose}>
     <form className="stack" onSubmit={submit}>
-      <Field label="Città"><input value={city} maxLength={120} required onChange={(event) => setCity(event.target.value)} /></Field>
+      <Field label="Città Lazio"><select value={city} required onChange={(event) => setCity(event.target.value)}>
+        <option value="">Seleziona città…</option>
+        {optionsWithCurrent(lookups.CITY, null).map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+      </select></Field>
       <div className="row wrap">
         <Field label="Costo consegna (€)"><input inputMode="decimal" value={fee} required onChange={(event) => setFee(event.target.value)} /></Field>
         <Field label="Minimo prodotti (€)"><input inputMode="decimal" value={minimum} required onChange={(event) => setMinimum(event.target.value)} /></Field>

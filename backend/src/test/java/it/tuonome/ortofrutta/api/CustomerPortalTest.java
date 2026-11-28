@@ -24,7 +24,7 @@ class CustomerPortalTest extends IntegrationTestBase {
     private static final String JSON = MediaType.APPLICATION_JSON_VALUE;
 
     @Test
-    void customerCanRequestDeliveryForACityWithoutAConfiguredZone() throws Exception {
+    void customerCannotRequestDeliveryOutsideLazio() throws Exception {
         String admin = admin();
         long productId = createProduct(admin, "Consegna libera " + System.nanoTime(), "KG", "2.00", "IVA_4");
         receive(admin, productId, "10", "1.00");
@@ -39,10 +39,8 @@ class CustomerPortalTest extends IntegrationTestBase {
                                  "deliveryCity":"Citta Non Configurata","deliveryPostalCode":"10100",
                                  "deliveryPhone":"3331234567","deliverySlotId":null}
                                 """.formatted(LocalDate.now().plusDays(1), productId)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.fulfillmentType").value("DELIVERY"))
-                .andExpect(jsonPath("$.deliveryFee").value(0))
-                .andExpect(jsonPath("$.total").value(4.00));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Le consegne sono disponibili solo per le città del Lazio"));
     }
 
     @Test
@@ -111,7 +109,7 @@ class CustomerPortalTest extends IntegrationTestBase {
         String admin = admin();
         long productId = createProduct(admin, "Consegna " + System.nanoTime(), "KG", "2.50", "IVA_4");
         receive(admin, productId, "5", "1.00");
-        long slotId = createDeliveryZone(admin, "Bologna", "3.00", "1.00", 2);
+        long slotId = createDeliveryZone(admin, "Roma", "3.00", "1.00", 2);
         String email = "consegna-" + System.nanoTime() + "@example.test";
         registerCustomer("Cliente Consegna", email);
         String customer = login(email, "password123");
@@ -120,7 +118,7 @@ class CustomerPortalTest extends IntegrationTestBase {
                         .content("""
                                 {"pickupDate":"%s","notes":null,"lines":[{"productId":%d,"quantity":2}],
                                  "fulfillmentType":"DELIVERY","deliveryAddress":"  Via Roma 12  ",
-                                 "deliveryCity":"Bologna","deliveryPostalCode":"40121",
+                                 "deliveryCity":"Roma","deliveryPostalCode":"00100",
                                  "deliveryPhone":"3331234567","deliveryNotes":"Citofono Rossi","deliverySlotId":%d}
                                 """.formatted(LocalDate.now().plusDays(1), productId, slotId)))
                 .andExpect(status().isCreated())
@@ -134,11 +132,11 @@ class CustomerPortalTest extends IntegrationTestBase {
         long orderId = json(body).get("id").asLong();
 
         mvc.perform(get("/api/delivery-zones/options").header(AUTH, customer)
-                        .param("city", "  bOlOgNa ").param("date", LocalDate.now().plusDays(1).toString()))
+                        .param("city", "  rOmA ").param("date", LocalDate.now().plusDays(1).toString()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.slots[0].remainingOrders").value(1));
-        mvc.perform(put("/api/delivery-zones/" + zoneIdForCity(admin, "Bologna"))
+        mvc.perform(put("/api/delivery-zones/" + zoneIdForCity(admin, "Roma"))
                         .header(AUTH, admin).contentType(JSON)
-                        .content(zoneBody("Bologna", "9.00", "1.00", 2, "10:00-13:00")))
+                        .content(zoneBody("Roma", "9.00", "1.00", 2, "10:00-13:00")))
                 .andExpect(status().isOk());
 
         mvc.perform(post("/api/customer-orders/" + orderId + "/pickup").header(AUTH, admin)
@@ -159,7 +157,7 @@ class CustomerPortalTest extends IntegrationTestBase {
         String admin = admin();
         long productId = createProduct(admin, "Capienza " + System.nanoTime(), "KG", "5.00", "IVA_4");
         receive(admin, productId, "10", "1.00");
-        String city = "Città " + System.nanoTime();
+        String city = "Cassino";
         long slotId = createDeliveryZone(admin, city, "2.00", "10.00", 1);
         String email = "capienza-" + System.nanoTime() + "@example.test";
         registerCustomer("Cliente Capienza", email);
@@ -175,10 +173,10 @@ class CustomerPortalTest extends IntegrationTestBase {
 
         long lessPriceId = createProduct(admin, "Minimo " + System.nanoTime(), "KG", "10.00", "IVA_4");
         receive(admin, lessPriceId, "10", "1.00");
-        long slotForOrder = createDeliveryZone(admin, city + " B", "2.00", "10.00", 1);
+        long slotForOrder = createDeliveryZone(admin, "Latina", "2.00", "10.00", 1);
         String order = delivery.replace("\"productId\":" + productId, "\"productId\":" + lessPriceId)
                 .replace("\"deliveryCity\":\"  " + city.toUpperCase() + "  \"",
-                        "\"deliveryCity\":\"" + (city + " B") + "\"")
+                        "\"deliveryCity\":\"Latina\"")
                 .replace("\"deliverySlotId\":" + slotId, "\"deliverySlotId\":" + slotForOrder);
         mvc.perform(post("/api/customer-orders/mine").header(AUTH, customer).contentType(JSON).content(order))
                 .andExpect(status().isCreated());
@@ -193,7 +191,7 @@ class CustomerPortalTest extends IntegrationTestBase {
         long secondProduct = createProduct(admin, "Concorrenza B " + System.nanoTime(), "KG", "10.00", "IVA_4");
         receive(admin, firstProduct, "10", "1.00");
         receive(admin, secondProduct, "10", "1.00");
-        String city = "Parallela " + System.nanoTime();
+        String city = "Rieti";
         long slotId = createDeliveryZone(admin, city, "0.00", "0.00", 1);
         String email = "parallela-" + System.nanoTime() + "@example.test";
         registerCustomer("Cliente Parallelo", email);
@@ -262,7 +260,7 @@ class CustomerPortalTest extends IntegrationTestBase {
         mvc.perform(post("/api/customer-orders/mine").header(AUTH, customer).contentType(JSON)
                         .content("""
                                 {"pickupDate":"%s","lines":[{"productId":%d,"quantity":1}],
-                                 "fulfillmentType":"DELIVERY","deliveryAddress":" ","deliveryCity":"Bologna",
+                                 "fulfillmentType":"DELIVERY","deliveryAddress":" ","deliveryCity":"Roma",
                                  "deliveryPostalCode":"40121","deliveryPhone":"3331234567"}
                                 """.formatted(LocalDate.now().plusDays(1), productId)))
                 .andExpect(status().isConflict());

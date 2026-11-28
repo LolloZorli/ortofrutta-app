@@ -4,19 +4,23 @@ import { useAuth } from '../auth'
 import { Chip, Empty, ErrorBox, Field, Loading } from '../components/ui'
 import { eur, qty, todayIso } from '../format'
 import { useLoad } from '../hooks'
+import { optionsWithCurrent, useLookups } from '../lookups'
 import { useToast } from '../toast'
 import type { CatalogItem, CompanyShop, CustomerOrder, DeliveryOptions } from '../types'
 
 export default function CustomerPortalPage() {
   const { profile } = useAuth()
   const toast = useToast()
+  const { lookups } = useLookups()
   const shops = useLoad<CompanyShop[]>(() => api.get('/companies'))
   const [selectedShopSlug, setSelectedShopSlug] = useState(() => companySession.slug())
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [pickupDate, setPickupDate] = useState('')
   const [fulfillmentType, setFulfillmentType] = useState<'PICKUP' | 'DELIVERY'>('PICKUP')
-  const [deliveryAddress, setDeliveryAddress] = useState('')
+  const [streetType, setStreetType] = useState('')
+  const [streetName, setStreetName] = useState('')
+  const [deliveryProvince, setDeliveryProvince] = useState('')
   const [deliveryCity, setDeliveryCity] = useState('')
   const [deliveryPostalCode, setDeliveryPostalCode] = useState('')
   const [deliveryPhone, setDeliveryPhone] = useState('')
@@ -70,6 +74,11 @@ export default function CustomerPortalPage() {
     setQuantities({})
     setBasketProducts({})
     setPickupDate('')
+    setStreetType('')
+    setStreetName('')
+    setDeliveryProvince('')
+    setDeliveryCity('')
+    setDeliveryPostalCode('')
     setDeliverySlotId('')
   }
 
@@ -97,8 +106,9 @@ export default function CustomerPortalPage() {
       if (!item || line.quantity > item.availableQuantity) return toast.error(`Disponibilità insufficiente per ${item?.name ?? 'un prodotto'}`)
     }
     if (!pickupDate || pickupDate < todayIso()) return toast.error('Scegli una data valida')
-    if (fulfillmentType === 'DELIVERY' && (!deliveryAddress.trim() || !deliveryCity.trim() || !deliveryPostalCode.trim() || !deliveryPhone.trim())) {
-      return toast.error('Per la consegna indica indirizzo, città, CAP e telefono')
+    const address = `${streetType} ${streetName}`.trim()
+    if (fulfillmentType === 'DELIVERY' && (!streetType || !streetName.trim() || !deliveryProvince || !deliveryCity.trim() || !deliveryPostalCode.trim() || !deliveryPhone.trim())) {
+      return toast.error('Per la consegna indica via, provincia, città, CAP e telefono')
     }
     if (fulfillmentType === 'DELIVERY') {
       if (deliveryOptions.data?.zoneAvailable && productSubtotal < deliveryOptions.data.minimumOrderSubtotal) {
@@ -112,7 +122,7 @@ export default function CustomerPortalPage() {
     try {
       await api.post('/customer-orders/mine', {
         pickupDate, notes: notes.trim() || null, lines, fulfillmentType,
-        deliveryAddress: fulfillmentType === 'DELIVERY' ? deliveryAddress : null,
+        deliveryAddress: fulfillmentType === 'DELIVERY' ? address : null,
         deliveryCity: fulfillmentType === 'DELIVERY' ? deliveryCity.trim() : null,
         deliveryPostalCode: fulfillmentType === 'DELIVERY' ? deliveryPostalCode.trim() : null,
         deliveryPhone: fulfillmentType === 'DELIVERY' ? deliveryPhone.trim() : null,
@@ -183,12 +193,30 @@ export default function CustomerPortalPage() {
           setDeliverySlotId('')
         }} /></Field>
         {fulfillmentType === 'DELIVERY' && <>
-          <Field label="Indirizzo di consegna"><input autoComplete="street-address" maxLength={250} value={deliveryAddress} onChange={(event) => setDeliveryAddress(event.target.value)} required /></Field>
           <div className="row wrap">
-            <Field label="Città"><input autoComplete="address-level2" maxLength={120} value={deliveryCity} onChange={(event) => {
+            <Field label="Tipo di via"><select value={streetType} onChange={(event) => setStreetType(event.target.value)} required>
+              <option value="">Seleziona…</option>
+              {optionsWithCurrent(lookups.STREET_TYPE, null).map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+            </select></Field>
+            <Field label="Nome via / piazza"><input autoComplete="street-address" maxLength={230} value={streetName} onChange={(event) => setStreetName(event.target.value)} required /></Field>
+          </div>
+          <Field label="Regione"><input value="Lazio" readOnly /></Field>
+          <div className="row wrap">
+            <Field label="Provincia"><select value={deliveryProvince} onChange={(event) => {
+              setDeliveryProvince(event.target.value)
+              setDeliveryCity('')
+              setDeliverySlotId('')
+            }} required>
+              <option value="">Seleziona provincia…</option>
+              {optionsWithCurrent(lookups.PROVINCE, null).map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+            </select></Field>
+            <Field label="Città"><select autoComplete="address-level2" value={deliveryCity} onChange={(event) => {
               setDeliveryCity(event.target.value)
               setDeliverySlotId('')
-            }} required /></Field>
+            }} required>
+              <option value="">Seleziona città…</option>
+              {optionsWithCurrent(lookups.CITY, null).map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+            </select></Field>
             <Field label="CAP"><input autoComplete="postal-code" maxLength={20} value={deliveryPostalCode} onChange={(event) => setDeliveryPostalCode(event.target.value)} required /></Field>
           </div>
           <Field label="Telefono per la consegna"><input autoComplete="tel" inputMode="tel" maxLength={30} value={deliveryPhone} onChange={(event) => setDeliveryPhone(event.target.value)} required /></Field>

@@ -5,7 +5,7 @@ import ProductSelect from '../components/ProductSelect'
 import { Chip, Empty, ErrorBox, Field, Loading } from '../components/ui'
 import { dateIt, eur, parseDecimal, qty, tomorrowIso } from '../format'
 import { useLoad } from '../hooks'
-import { useLookups } from '../lookups'
+import { optionsWithCurrent, useLookups } from '../lookups'
 import { useToast } from '../toast'
 import type { Customer, DeliveryOptions, Product, Reservation, ReservationStatus } from '../types'
 
@@ -190,6 +190,7 @@ interface DraftLine {
 
 function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const toast = useToast()
+  const { lookups } = useLookups()
   const customers = useLoad<Customer[]>(() => api.get('/customers'))
   const products = useLoad<Product[]>(() => api.get('/products'))
   const [customerId, setCustomerId] = useState('')
@@ -198,7 +199,9 @@ function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [newPhone, setNewPhone] = useState('')
   const [pickupDate, setPickupDate] = useState(tomorrowIso())
   const [fulfillmentType, setFulfillmentType] = useState<'PICKUP' | 'DELIVERY'>('PICKUP')
-  const [deliveryAddress, setDeliveryAddress] = useState('')
+  const [streetType, setStreetType] = useState('')
+  const [streetName, setStreetName] = useState('')
+  const [deliveryProvince, setDeliveryProvince] = useState('')
   const [deliveryCity, setDeliveryCity] = useState('')
   const [deliveryPostalCode, setDeliveryPostalCode] = useState('')
   const [deliveryPhone, setDeliveryPhone] = useState('')
@@ -233,8 +236,9 @@ function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
       body.push({ productId: Number(l.productId), quantity: q })
     }
     if (body.length === 0) return toast.error('Aggiungi almeno un prodotto')
-    if (fulfillmentType === 'DELIVERY' && (!deliveryAddress.trim() || !deliveryCity.trim() || !deliveryPostalCode.trim() || !deliveryPhone.trim())) {
-      return toast.error('Per la consegna indica indirizzo, città, CAP e telefono')
+    const address = `${streetType} ${streetName}`.trim()
+    if (fulfillmentType === 'DELIVERY' && (!streetType || !streetName.trim() || !deliveryProvince || !deliveryCity.trim() || !deliveryPostalCode.trim() || !deliveryPhone.trim())) {
+      return toast.error('Per la consegna indica via, provincia, città, CAP e telefono')
     }
     if (fulfillmentType === 'DELIVERY') {
       if (deliveryOptions.data?.zoneAvailable && productSubtotal < deliveryOptions.data.minimumOrderSubtotal) {
@@ -254,7 +258,7 @@ function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
       }
       await api.post('/customer-orders', {
         customerId: id, pickupDate, notes: notes.trim() || null, lines: body, fulfillmentType,
-        deliveryAddress: fulfillmentType === 'DELIVERY' ? deliveryAddress : null,
+        deliveryAddress: fulfillmentType === 'DELIVERY' ? address : null,
         deliveryCity: fulfillmentType === 'DELIVERY' ? deliveryCity.trim() : null,
         deliveryPostalCode: fulfillmentType === 'DELIVERY' ? deliveryPostalCode.trim() : null,
         deliveryPhone: fulfillmentType === 'DELIVERY' ? deliveryPhone.trim() : null,
@@ -312,12 +316,30 @@ function NewReservationModal({ onClose, onCreated }: { onClose: () => void; onCr
           }} required />
         </Field>
         {fulfillmentType === 'DELIVERY' && <>
-          <Field label="Indirizzo di consegna"><input maxLength={250} value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} required /></Field>
           <div className="row wrap">
-            <Field label="Città"><input maxLength={120} value={deliveryCity} onChange={(e) => {
+            <Field label="Tipo di via"><select value={streetType} onChange={(e) => setStreetType(e.target.value)} required>
+              <option value="">Seleziona…</option>
+              {optionsWithCurrent(lookups.STREET_TYPE, null).map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+            </select></Field>
+            <Field label="Nome via / piazza"><input maxLength={230} value={streetName} onChange={(e) => setStreetName(e.target.value)} required /></Field>
+          </div>
+          <Field label="Regione"><input value="Lazio" readOnly /></Field>
+          <div className="row wrap">
+            <Field label="Provincia"><select value={deliveryProvince} onChange={(e) => {
+              setDeliveryProvince(e.target.value)
+              setDeliveryCity('')
+              setDeliverySlotId('')
+            }} required>
+              <option value="">Seleziona provincia…</option>
+              {optionsWithCurrent(lookups.PROVINCE, null).map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+            </select></Field>
+            <Field label="Città"><select value={deliveryCity} onChange={(e) => {
               setDeliveryCity(e.target.value)
               setDeliverySlotId('')
-            }} required /></Field>
+            }} required>
+              <option value="">Seleziona città…</option>
+              {optionsWithCurrent(lookups.CITY, null).map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}
+            </select></Field>
             <Field label="CAP"><input maxLength={20} value={deliveryPostalCode} onChange={(e) => setDeliveryPostalCode(e.target.value)} required /></Field>
           </div>
           <Field label="Telefono per la consegna"><input maxLength={30} value={deliveryPhone} onChange={(e) => setDeliveryPhone(e.target.value)} required /></Field>

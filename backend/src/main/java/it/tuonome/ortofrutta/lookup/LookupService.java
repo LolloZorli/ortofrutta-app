@@ -91,6 +91,12 @@ public class LookupService {
         return i == null ? null : i.name();
     }
 
+    public boolean hasActiveName(LookupType type, String name) {
+        if (name == null || name.isBlank()) return false;
+        return list(type, false).stream()
+                .anyMatch(i -> i.name().equalsIgnoreCase(name.trim()));
+    }
+
     public String unitLabel(Long unitId) {
         LookupItem u = find(LookupType.UNIT, unitId);
         return u == null || u.shortLabel() == null ? "" : u.shortLabel();
